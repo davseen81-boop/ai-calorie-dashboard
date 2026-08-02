@@ -50,8 +50,10 @@ function getAiConfig(): AiConfig {
   try {
     return { apiKey: aiEnv.ANTHROPIC_API_KEY, model: aiEnv.ANTHROPIC_MODEL };
   } catch (error) {
+    // Deliberately environment-agnostic: this message reaches users on the
+    // deployed site too, where advice to edit .env.local is meaningless.
     throw new AiAnalysisError(
-      "AI analysis is not configured. Add ANTHROPIC_API_KEY to .env.local and restart the server.",
+      "AI analysis isn't set up yet — ANTHROPIC_API_KEY is missing.",
       "not_configured",
       error instanceof Error ? error.message : undefined,
     );
