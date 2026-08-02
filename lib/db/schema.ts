@@ -142,6 +142,147 @@ export const mealItems = sqliteTable(
   }),
 );
 
+// ---------------------------------------------------------------------------
+// Routines — reusable meals and whole-day templates
+// ---------------------------------------------------------------------------
+
+export const ROUTINE_KINDS = ["meal", "day"] as const;
+
+/**
+ * A saved, reusable eating pattern.
+ *
+ * `kind: "meal"` holds exactly one entry in `routineMeals` ("my usual
+ * breakfast"); `kind: "day"` holds several ("training day"). Both use the same
+ * child tables rather than parallel structures, so applying a routine is one
+ * code path regardless of kind.
+ */
+export const routines = sqliteTable(
+  "routines",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().default(DEFAULT_USER_ID),
+
+    name: text("name").notNull(),
+    kind: text("kind", { enum: ROUTINE_KINDS }).notNull().default("meal"),
+
+    /** Pinned to the top of the picker. */
+    isFavorite: integer("is_favorite", { mode: "boolean" })
+      .notNull()
+      .default(false),
+
+    /** Cheap usage signal for ordering the picker by what's actually used. */
+    useCount: integer("use_count").notNull().default(0),
+    lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }),
+
+    ...timestamps,
+  },
+  (table) => ({
+    userIdx: index("routines_user_idx").on(table.userId, table.isFavorite),
+  }),
+);
+
+export const routineMeals = sqliteTable(
+  "routine_meals",
+  {
+    id: text("id").primaryKey(),
+    routineId: text("routine_id")
+      .notNull()
+      .references(() => routines.id, { onDelete: "cascade" }),
+
+    name: text("name").notNull(),
+    mealType: text("meal_type", { enum: MEAL_TYPES }).notNull().default("snack"),
+
+    /**
+     * Optional `HH:mm`. On a day template this spaces the meals across the day
+     * instead of stacking them all at the moment it was applied.
+     */
+    timeOfDay: text("time_of_day"),
+
+    position: integer("position").notNull().default(0),
+    ...timestamps,
+  },
+  (table) => ({
+    routineIdx: index("routine_meals_routine_idx").on(
+      table.routineId,
+      table.position,
+    ),
+  }),
+);
+
+export const routineMealItems = sqliteTable(
+  "routine_meal_items",
+  {
+    id: text("id").primaryKey(),
+    routineMealId: text("routine_meal_id")
+      .notNull()
+      .references(() => routineMeals.id, { onDelete: "cascade" }),
+
+    name: text("name").notNull(),
+    quantity: real("quantity").notNull().default(1),
+    unit: text("unit").notNull().default("serving"),
+    calories: real("calories").notNull().default(0),
+    proteinG: real("protein_g").notNull().default(0),
+    carbsG: real("carbs_g").notNull().default(0),
+    fatG: real("fat_g").notNull().default(0),
+
+    position: integer("position").notNull().default(0),
+    ...timestamps,
+  },
+  (table) => ({
+    mealIdx: index("routine_meal_items_meal_idx").on(
+      table.routineMealId,
+      table.position,
+    ),
+  }),
+);
+
+/**
+ * Optional auto-logging schedule for a routine.
+ *
+ * Runs are *caught up* when the app is next opened rather than fired by a
+ * timer, so a meal is only ever logged once its scheduled time has actually
+ * passed — never for a time still in the future. `lastRunOn` is the local
+ * calendar date of the last run and makes the operation idempotent.
+ */
+export const routineSchedules = sqliteTable(
+  "routine_schedules",
+  {
+    id: text("id").primaryKey(),
+    routineId: text("routine_id")
+      .notNull()
+      .references(() => routines.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().default(DEFAULT_USER_ID),
+
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+
+    /** ISO weekdays as CSV — "1,2,3,4,5" is Mon–Fri. */
+    daysOfWeek: text("days_of_week").notNull().default("1,2,3,4,5,6,7"),
+
+    /** `HH:mm` in the profile's timezone. */
+    timeOfDay: text("time_of_day").notNull().default("08:00"),
+
+    /** Local `yyyy-MM-dd` of the last run; the idempotency key. */
+    lastRunOn: text("last_run_on"),
+
+    ...timestamps,
+  },
+  (table) => ({
+    userIdx: index("routine_schedules_user_idx").on(table.userId, table.enabled),
+  }),
+);
+
+export type RoutineRow = typeof routines.$inferSelect;
+export type RoutineMealRow = typeof routineMeals.$inferSelect;
+export type RoutineMealItemRow = typeof routineMealItems.$inferSelect;
+export type RoutineScheduleRow = typeof routineSchedules.$inferSelect;
+export type RoutineKind = (typeof ROUTINE_KINDS)[number];
+
+/** A routine with everything needed to apply it. */
+export type RoutineWithMeals = RoutineRow & {
+  meals: Array<RoutineMealRow & { items: RoutineMealItemRow[] }>;
+  schedule: RoutineScheduleRow | null;
+};
+
 export type ProfileRow = typeof profiles.$inferSelect;
 export type NewProfileRow = typeof profiles.$inferInsert;
 export type MealRow = typeof meals.$inferSelect;

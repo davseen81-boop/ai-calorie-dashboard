@@ -30,6 +30,7 @@ import { MEAL_TYPES } from "@/lib/db/schema";
 import { useAnalyzeMeal, useSaveMeal } from "@/hooks/use-meals";
 import type { AnalyzedItem, AnalyzeResponse, MealType } from "@/types/api";
 import { AnalyzedItemsEditor } from "./analyzed-items-editor";
+import { RepeatPicker } from "./repeat-picker";
 
 /** Matches the server-side cap in lib/validation/meals.ts (~7MB of image). */
 const MAX_IMAGE_BYTES = 7_000_000;
@@ -190,7 +191,7 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
         </SheetTitle>
         <SheetDescription>
           {stage === "input"
-            ? "Describe what you ate, take a photo, or enter it yourself."
+            ? "Repeat something you eat often, or describe it, photograph it, or enter it yourself."
             : source === "manual"
               ? "Add each food and its nutrition, then save."
               : "These are estimates. Correct anything that looks off before saving."}
@@ -199,12 +200,19 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
         {stage === "input" ? (
-          <Tabs defaultValue="text" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+          <Tabs defaultValue="repeat" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="repeat">Repeat</TabsTrigger>
               <TabsTrigger value="text">Text</TabsTrigger>
               <TabsTrigger value="photo">Photo</TabsTrigger>
               <TabsTrigger value="manual">Manual</TabsTrigger>
             </TabsList>
+
+            {/* Listed first and selected by default: re-logging something you
+                eat regularly is the most common action, and it's one tap. */}
+            <TabsContent value="repeat" className="mt-4">
+              <RepeatPicker onLogged={onDone} />
+            </TabsContent>
 
             <TabsContent value="text" className="mt-4 space-y-4">
               <div className="space-y-2">

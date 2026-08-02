@@ -3,6 +3,10 @@ import type {
   MealRow,
   MealType,
   ProfileRow,
+  RoutineMealItemRow,
+  RoutineMealRow,
+  RoutineRow,
+  RoutineScheduleRow,
 } from "@/lib/db/schema";
 
 /**
@@ -31,6 +35,13 @@ export type ApiProfile = Omit<
 > & {
   /** Decoded from the JSON string the database stores. */
   dietaryPreferences: string[];
+};
+
+export type ApiRoutine = Serialized<RoutineRow> & {
+  meals: Array<
+    Serialized<RoutineMealRow> & { items: Array<Serialized<RoutineMealItemRow>> }
+  >;
+  schedule: Serialized<RoutineScheduleRow> | null;
 };
 
 export interface MacroTotals {

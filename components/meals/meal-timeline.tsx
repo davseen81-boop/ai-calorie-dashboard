@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import { format, parseISO } from "date-fns";
-import { MoreVertical, Pencil, Sparkles, Trash2, UtensilsCrossed } from "lucide-react";
+import {
+  MoreVertical,
+  Pencil,
+  Repeat2,
+  Sparkles,
+  Trash2,
+  UtensilsCrossed,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { useDeleteMeal } from "@/hooks/use-meals";
 import type { ApiMeal } from "@/types/api";
 import { EditMealDialog } from "./edit-meal-dialog";
+import { SaveAsRoutineDialog } from "./save-as-routine-dialog";
 
 const MEAL_TYPE_STYLES: Record<string, string> = {
   breakfast: "bg-warning/10 text-warning border-warning/20",
@@ -36,6 +44,7 @@ const MEAL_TYPE_STYLES: Record<string, string> = {
 export function MealTimeline({ meals }: { meals: ApiMeal[] }) {
   const [pendingDelete, setPendingDelete] = useState<ApiMeal | null>(null);
   const [editing, setEditing] = useState<ApiMeal | null>(null);
+  const [savingRoutine, setSavingRoutine] = useState<ApiMeal | null>(null);
   const deleteMeal = useDeleteMeal();
 
   if (meals.length === 0) {
@@ -122,6 +131,10 @@ export function MealTimeline({ meals }: { meals: ApiMeal[] }) {
                       <Pencil className="mr-2 size-4" />
                       Edit
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSavingRoutine(meal)}>
+                      <Repeat2 className="mr-2 size-4" />
+                      Save as routine
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-destructive focus:text-destructive"
                       onClick={() => setPendingDelete(meal)}
@@ -170,9 +183,11 @@ export function MealTimeline({ meals }: { meals: ApiMeal[] }) {
         </DialogContent>
       </Dialog>
 
-      <EditMealDialog
-        meal={editing}
-        onClose={() => setEditing(null)}
+      <EditMealDialog meal={editing} onClose={() => setEditing(null)} />
+
+      <SaveAsRoutineDialog
+        meal={savingRoutine}
+        onClose={() => setSavingRoutine(null)}
       />
     </>
   );

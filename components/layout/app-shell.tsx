@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Flame, History, LayoutDashboard, Settings } from "lucide-react";
+import {
+  Flame,
+  History,
+  LayoutDashboard,
+  Repeat2,
+  Settings,
+} from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { LogMealSheet } from "@/components/meals/log-meal-sheet";
@@ -10,6 +16,7 @@ import { ThemeToggle } from "./theme-toggle";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/routines", label: "Routines", icon: Repeat2 },
   { href: "/history", label: "History", icon: History },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
@@ -71,7 +78,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur md:hidden">
-        <div className="grid grid-cols-3">
+        <div className="grid grid-cols-4">
           {NAV.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href;
