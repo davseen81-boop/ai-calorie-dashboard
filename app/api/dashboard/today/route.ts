@@ -1,5 +1,6 @@
 import { handleRouteError, ok } from "@/lib/api/response";
 import { getTodaySummary } from "@/lib/db/dashboard";
+import { requireUserId } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,8 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   try {
-    return ok(await getTodaySummary());
+    const userId = await requireUserId();
+    return ok(await getTodaySummary(userId));
   } catch (error) {
     return handleRouteError(error);
   }

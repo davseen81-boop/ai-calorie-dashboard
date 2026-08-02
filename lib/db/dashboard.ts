@@ -3,7 +3,7 @@ import "server-only";
 import { and, eq, gte, lt, sql } from "drizzle-orm";
 
 import { db } from "./index";
-import { DEFAULT_USER_ID, meals } from "./schema";
+import { meals } from "./schema";
 import { dayRangeInZone, recentDayRanges } from "@/lib/date";
 import { getOrCreateProfile } from "./queries";
 import { listMeals } from "./queries";
@@ -73,7 +73,7 @@ function round(value: number): number {
 }
 
 export async function getTodaySummary(
-  userId: string = DEFAULT_USER_ID,
+  userId: string,
   now: Date = new Date(),
 ): Promise<TodaySummary> {
   const profile = await getOrCreateProfile(userId);
@@ -140,7 +140,7 @@ export interface WeeklySummary {
 
 export async function getWeeklySummary(
   days = 7,
-  userId: string = DEFAULT_USER_ID,
+  userId: string,
   now: Date = new Date(),
 ): Promise<WeeklySummary> {
   const profile = await getOrCreateProfile(userId);

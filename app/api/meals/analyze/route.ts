@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { analyzeMealPhoto, analyzeMealText } from "@/lib/ai/analyze";
 import { handleRouteError, ok } from "@/lib/api/response";
 import { getOrCreateProfile } from "@/lib/db/queries";
+import { requireUserId } from "@/lib/auth/session";
 import { localTimeLabel } from "@/lib/date";
 import { analyzeRequestSchema } from "@/lib/validation/meals";
 
@@ -24,7 +25,8 @@ export async function POST(request: NextRequest) {
     const body: unknown = await request.json();
     const input = analyzeRequestSchema.parse(body);
 
-    const profile = await getOrCreateProfile();
+    const userId = await requireUserId();
+    const profile = await getOrCreateProfile(userId);
     const context = {
       dietaryPreferences: parseDietaryPreferences(profile.dietaryPreferences),
       mealTypeHint: input.mealTypeHint,

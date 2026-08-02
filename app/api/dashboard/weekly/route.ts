@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { handleRouteError, ok } from "@/lib/api/response";
 import { getWeeklySummary } from "@/lib/db/dashboard";
+import { requireUserId } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,8 @@ export async function GET(request: NextRequest) {
     const { days } = querySchema.parse(
       Object.fromEntries(request.nextUrl.searchParams),
     );
-    return ok(await getWeeklySummary(days));
+    const userId = await requireUserId();
+    return ok(await getWeeklySummary(days, userId));
   } catch (error) {
     return handleRouteError(error);
   }

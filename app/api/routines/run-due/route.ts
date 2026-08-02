@@ -1,5 +1,6 @@
 import { handleRouteError, ok } from "@/lib/api/response";
 import { runDueSchedules } from "@/lib/db/routines";
+import { requireUserId } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,8 @@ export const dynamic = "force-dynamic";
  */
 export async function POST() {
   try {
-    return ok(await runDueSchedules());
+    const userId = await requireUserId();
+    return ok(await runDueSchedules(new Date(), userId));
   } catch (error) {
     return handleRouteError(error);
   }

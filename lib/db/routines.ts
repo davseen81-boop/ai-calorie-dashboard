@@ -4,7 +4,6 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "./index";
 import {
-  DEFAULT_USER_ID,
   routineMealItems,
   routineMeals,
   routineSchedules,
@@ -55,7 +54,7 @@ export interface CreateRoutineInput {
 // ---------------------------------------------------------------------------
 
 export async function listRoutines(
-  userId: string = DEFAULT_USER_ID,
+  userId: string,
 ): Promise<RoutineWithMeals[]> {
   const rows = await db.query.routines.findMany({
     where: eq(routines.userId, userId),
@@ -73,7 +72,7 @@ export async function listRoutines(
 
 export async function getRoutineById(
   id: string,
-  userId: string = DEFAULT_USER_ID,
+  userId: string,
 ): Promise<RoutineWithMeals | null> {
   const row = await db.query.routines.findFirst({
     where: and(eq(routines.id, id), eq(routines.userId, userId)),
@@ -140,7 +139,7 @@ async function hydrate(
 
 export async function createRoutine(
   input: CreateRoutineInput,
-  userId: string = DEFAULT_USER_ID,
+  userId: string,
 ): Promise<RoutineWithMeals> {
   const routineId = crypto.randomUUID();
 
@@ -172,7 +171,7 @@ export interface UpdateRoutineInput {
 export async function updateRoutine(
   id: string,
   input: UpdateRoutineInput,
-  userId: string = DEFAULT_USER_ID,
+  userId: string,
 ): Promise<RoutineWithMeals | null> {
   const existing = await db.query.routines.findFirst({
     where: and(eq(routines.id, id), eq(routines.userId, userId)),
@@ -209,7 +208,7 @@ export async function updateRoutine(
 
 export async function deleteRoutine(
   id: string,
-  userId: string = DEFAULT_USER_ID,
+  userId: string,
 ): Promise<boolean> {
   const deleted = await db
     .delete(routines)
@@ -280,7 +279,7 @@ async function writeSchedule(
 export async function applyRoutine(
   id: string,
   options: { at?: Date; timezone?: string } = {},
-  userId: string = DEFAULT_USER_ID,
+  userId: string,
 ): Promise<{ routine: RoutineWithMeals; mealIds: string[] } | null> {
   const routine = await getRoutineById(id, userId);
   if (!routine) return null;
@@ -344,7 +343,7 @@ export async function applyRoutine(
  */
 export async function runDueSchedules(
   now: Date = new Date(),
-  userId: string = DEFAULT_USER_ID,
+  userId: string,
 ): Promise<{ applied: Array<{ routineId: string; name: string }> }> {
   const profile = await getOrCreateProfile(userId);
   const timezone = profile.timezone;

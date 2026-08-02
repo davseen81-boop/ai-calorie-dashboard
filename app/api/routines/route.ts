@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 
 import { handleRouteError, ok } from "@/lib/api/response";
 import { createRoutine, listRoutines } from "@/lib/db/routines";
+import { requireUserId } from "@/lib/auth/session";
 import { createRoutineSchema } from "@/lib/validation/routines";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +10,8 @@ export const dynamic = "force-dynamic";
 /** GET /api/routines — favourites first, then most-used. */
 export async function GET() {
   try {
-    return ok({ routines: await listRoutines() });
+    const userId = await requireUserId();
+    return ok({ routines: await listRoutines(userId) });
   } catch (error) {
     return handleRouteError(error);
   }
@@ -21,6 +23,7 @@ export async function POST(request: NextRequest) {
     const body: unknown = await request.json();
     const input = createRoutineSchema.parse(body);
 
+    const userId = await requireUserId();
     const routine = await createRoutine({
       name: input.name,
       kind: input.kind,
@@ -32,7 +35,7 @@ export async function POST(request: NextRequest) {
         items: meal.items,
       })),
       schedule: input.schedule ?? null,
-    });
+    }, userId);
 
     return ok(routine, { status: 201 });
   } catch (error) {

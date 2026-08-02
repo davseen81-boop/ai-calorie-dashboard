@@ -21,8 +21,14 @@ import {
  *  - Money-free numerics use REAL; nothing here needs exact decimal semantics.
  */
 
-/** Single-user build: every row is attributed to this id. */
+/**
+ * Rows created before accounts existed carry this id.
+ *
+ * The first person to sign up adopts them, so an existing single-user install
+ * keeps its history instead of stranding it behind a login.
+ */
 export const DEFAULT_USER_ID = "local-user";
+
 
 export const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"] as const;
 export const MEAL_SOURCES = ["text", "photo", "manual"] as const;
@@ -54,6 +60,25 @@ const timestamps = {
  * User settings and daily targets. One row per user — in the single-user build
  * that means exactly one row, keyed by DEFAULT_USER_ID.
  */
+/**
+ * An account.
+ *
+ * Deliberately has no foreign keys pointing at it: `meals.userId` and friends
+ * predate this table and still hold `local-user` until adoption, which an FK
+ * would reject.
+ */
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey(),
+  /** Stored lowercased and trimmed; the uniqueness guarantee depends on it. */
+  email: text("email").notNull().unique(),
+  /** scrypt, as `salt:derivedKey` in hex. Never the password itself. */
+  passwordHash: text("password_hash").notNull(),
+  displayName: text("display_name"),
+  ...timestamps,
+});
+
+export type UserRow = typeof users.$inferSelect;
+
 export const profiles = sqliteTable("profiles", {
   id: text("id").primaryKey(),
 

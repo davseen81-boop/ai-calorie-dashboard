@@ -4,7 +4,6 @@ import { and, asc, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 
 import { db } from "./index";
 import {
-  DEFAULT_USER_ID,
   meals,
   mealItems,
   profiles,
@@ -42,7 +41,7 @@ type DbOrTx = typeof db | Transaction;
  * profile is read.
  */
 export async function getOrCreateProfile(
-  userId: string = DEFAULT_USER_ID,
+  userId: string,
 ): Promise<ProfileRow> {
   const existing = await db.query.profiles.findFirst({
     where: eq(profiles.id, userId),
@@ -64,7 +63,7 @@ export async function getOrCreateProfile(
 
 export async function updateProfile(
   patch: Partial<Omit<ProfileRow, "id" | "createdAt" | "updatedAt">>,
-  userId: string = DEFAULT_USER_ID,
+  userId: string,
 ): Promise<ProfileRow> {
   await getOrCreateProfile(userId);
 
@@ -149,7 +148,7 @@ export interface CreateMealInput {
 /** Insert a meal and its items atomically, then derive the totals. */
 export async function createMeal(
   input: CreateMealInput,
-  userId: string = DEFAULT_USER_ID,
+  userId: string,
 ): Promise<MealWithItems> {
   const mealId = crypto.randomUUID();
 
@@ -188,7 +187,7 @@ export async function createMeal(
 
 export async function getMealById(
   mealId: string,
-  userId: string = DEFAULT_USER_ID,
+  userId: string,
 ): Promise<MealWithItems | null> {
   const meal = await db.query.meals.findFirst({
     where: and(eq(meals.id, mealId), eq(meals.userId, userId)),
@@ -215,7 +214,7 @@ export interface ListMealsOptions {
 /** Meals whose `loggedAt` falls in `[from, to)`, newest first. */
 export async function listMeals(
   options: ListMealsOptions = {},
-  userId: string = DEFAULT_USER_ID,
+  userId: string,
 ): Promise<MealWithItems[]> {
   const { from, to, limit = 100, offset = 0, search, mealType } = options;
 
@@ -277,7 +276,7 @@ export interface UpdateMealInput {
 export async function updateMeal(
   mealId: string,
   input: UpdateMealInput,
-  userId: string = DEFAULT_USER_ID,
+  userId: string,
 ): Promise<MealWithItems | null> {
   const existing = await db.query.meals.findFirst({
     where: and(eq(meals.id, mealId), eq(meals.userId, userId)),
@@ -313,7 +312,7 @@ export async function updateMeal(
 
 export async function deleteMeal(
   mealId: string,
-  userId: string = DEFAULT_USER_ID,
+  userId: string,
 ): Promise<boolean> {
   // Items disappear via ON DELETE CASCADE (foreign keys are enabled in
   // lib/db/index.ts).

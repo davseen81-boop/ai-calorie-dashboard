@@ -13,6 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 import { LogMealSheet } from "@/components/meals/log-meal-sheet";
 import { ThemeToggle } from "./theme-toggle";
+import { UserMenu } from "./user-menu";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -62,6 +63,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           <div className="ml-auto flex items-center gap-2">
             <ThemeToggle />
+            <UserMenu />
             <div className="hidden md:block">
               <LogMealSheet />
             </div>

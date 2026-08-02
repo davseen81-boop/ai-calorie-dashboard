@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 
 import { handleRouteError, ok } from "@/lib/api/response";
 import { createMeal, listMeals } from "@/lib/db/queries";
+import { requireUserId } from "@/lib/auth/session";
 import { createMealSchema, listMealsQuerySchema } from "@/lib/validation/meals";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,8 @@ export async function GET(request: NextRequest) {
     const params = Object.fromEntries(request.nextUrl.searchParams);
     const query = listMealsQuerySchema.parse(params);
 
-    const meals = await listMeals(query);
+    const userId = await requireUserId();
+    const meals = await listMeals(query, userId);
 
     return ok({
       meals,
@@ -44,6 +46,7 @@ export async function POST(request: NextRequest) {
     const body: unknown = await request.json();
     const input = createMealSchema.parse(body);
 
+    const userId = await requireUserId();
     const meal = await createMeal({
       name: input.name,
       mealType: input.mealType,
@@ -61,7 +64,7 @@ export async function POST(request: NextRequest) {
         carbsG: item.carbsG,
         fatG: item.fatG,
       })),
-    });
+    }, userId);
 
     return ok(meal, { status: 201 });
   } catch (error) {

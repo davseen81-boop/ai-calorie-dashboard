@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 
 import { fail, handleRouteError, ok } from "@/lib/api/response";
 import { applyRoutine } from "@/lib/db/routines";
+import { requireUserId } from "@/lib/auth/session";
 import { applyRoutineSchema } from "@/lib/validation/routines";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,8 @@ export async function POST(
     const body: unknown = await request.json().catch(() => ({}));
     const { at } = applyRoutineSchema.parse(body);
 
-    const result = await applyRoutine(params.id, { at });
+    const userId = await requireUserId();
+    const result = await applyRoutine(params.id, { at }, userId);
     if (!result) return fail("not_found", "Routine not found.", 404);
 
     return ok(

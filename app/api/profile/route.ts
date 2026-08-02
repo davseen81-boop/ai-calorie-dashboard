@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 
 import { handleRouteError, ok } from "@/lib/api/response";
 import { getOrCreateProfile, updateProfile } from "@/lib/db/queries";
+import { requireUserId } from "@/lib/auth/session";
 import { updateProfileSchema } from "@/lib/validation/profile";
 import type { ApiProfile } from "@/types/api";
 import type { ProfileRow } from "@/lib/db/schema";
@@ -11,7 +12,8 @@ export const dynamic = "force-dynamic";
 /** GET /api/profile — settings and daily goals, created on first access. */
 export async function GET() {
   try {
-    return ok(serialize(await getOrCreateProfile()));
+    const userId = await requireUserId();
+    return ok(serialize(await getOrCreateProfile(userId)));
   } catch (error) {
     return handleRouteError(error);
   }
@@ -21,6 +23,7 @@ export async function GET() {
 export async function PATCH(request: NextRequest) {
   try {
     const body: unknown = await request.json();
+    const userId = await requireUserId();
     const input = updateProfileSchema.parse(body);
 
     const { dietaryPreferences, ...rest } = input;
@@ -33,7 +36,7 @@ export async function PATCH(request: NextRequest) {
       patch.dietaryPreferences = JSON.stringify(dietaryPreferences);
     }
 
-    const updated = await updateProfile(patch);
+    const updated = await updateProfile(patch, userId);
 
     return ok(serialize(updated));
   } catch (error) {

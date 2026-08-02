@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 
 import { fail, handleRouteError, ok } from "@/lib/api/response";
 import { deleteMeal, getMealById, updateMeal } from "@/lib/db/queries";
+import { requireUserId } from "@/lib/auth/session";
 import { updateMealSchema } from "@/lib/validation/meals";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +14,8 @@ interface RouteContext {
 /** GET /api/meals/[id] */
 export async function GET(_request: NextRequest, { params }: RouteContext) {
   try {
-    const meal = await getMealById(params.id);
+    const userId = await requireUserId();
+    const meal = await getMealById(params.id, userId);
     if (!meal) return fail("not_found", "Meal not found.", 404);
     return ok(meal);
   } catch (error) {
@@ -31,6 +33,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     const body: unknown = await request.json();
     const input = updateMealSchema.parse(body);
 
+    const userId = await requireUserId();
     const meal = await updateMeal(params.id, {
       name: input.name,
       mealType: input.mealType,
@@ -45,7 +48,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
         carbsG: item.carbsG,
         fatG: item.fatG,
       })),
-    });
+    }, userId);
 
     if (!meal) return fail("not_found", "Meal not found.", 404);
     return ok(meal);
@@ -57,7 +60,8 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 /** DELETE /api/meals/[id] — items cascade. */
 export async function DELETE(_request: NextRequest, { params }: RouteContext) {
   try {
-    const deleted = await deleteMeal(params.id);
+    const userId = await requireUserId();
+    const deleted = await deleteMeal(params.id, userId);
     if (!deleted) return fail("not_found", "Meal not found.", 404);
     return ok({ id: params.id, deleted: true });
   } catch (error) {

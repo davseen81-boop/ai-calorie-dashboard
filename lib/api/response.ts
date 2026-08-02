@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
-import { AiAnalysisError } from "@/lib/ai/analyze";
+import { AiAnalysisError } from "@/lib/ai/errors";
+import { UnauthorizedError } from "@/lib/auth/session";
 
 /**
  * One response envelope for every route: `{ data }` on success,
@@ -11,6 +12,7 @@ import { AiAnalysisError } from "@/lib/ai/analyze";
 
 export type ApiErrorCode =
   | "bad_request"
+  | "unauthorized"
   | "not_found"
   | "validation_failed"
   | "ai_invalid_response"
@@ -50,6 +52,10 @@ export function fail(
  * server-side and replaced with a generic message.
  */
 export function handleRouteError(error: unknown): NextResponse {
+  if (error instanceof UnauthorizedError) {
+    return fail("unauthorized", error.message, 401);
+  }
+
   if (error instanceof ZodError) {
     return fail(
       "validation_failed",
