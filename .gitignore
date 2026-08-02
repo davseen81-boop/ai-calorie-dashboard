@@ -40,3 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Appended by `vercel link`. Kept, but narrowed: a bare `.env*` would also
+# ignore the committed .env.example template that documents every variable.
+.env*
+!.env.example
