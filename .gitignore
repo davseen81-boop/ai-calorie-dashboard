@@ -28,6 +28,12 @@ yarn-error.log*
 # local env files
 .env*.local
 
+# local sqlite database (schema lives in drizzle/, data is disposable)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
 # vercel
 .vercel
 

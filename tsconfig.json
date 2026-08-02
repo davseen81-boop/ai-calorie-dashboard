@@ -1,5 +1,8 @@
 {
   "compilerOptions": {
+    // Without an explicit target, tsc assumes ES5 and rejects iterating a Map
+    // without --downlevelIteration. Next transpiles independently of this.
+    "target": "ES2017",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,

@@ -1,0 +1,418 @@
+"use client";
+
+import { useRef, useState } from "react";
+import { Camera, Loader2, Plus, Sparkles, X } from "lucide-react";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import { MEAL_TYPES } from "@/lib/db/schema";
+import { useAnalyzeMeal, useSaveMeal } from "@/hooks/use-meals";
+import type { AnalyzedItem, AnalyzeResponse, MealType } from "@/types/api";
+import { AnalyzedItemsEditor } from "./analyzed-items-editor";
+
+/** Matches the server-side cap in lib/validation/meals.ts (~7MB of image). */
+const MAX_IMAGE_BYTES = 7_000_000;
+
+export function LogMealSheet({ floating = false }: { floating?: boolean }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Sheet
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+      }}
+    >
+      <SheetTrigger asChild>
+        {floating ? (
+          <Button
+            size="icon"
+            className="gradient-primary size-14 rounded-full text-white shadow-lg hover:opacity-90"
+            aria-label="Log a meal"
+          >
+            <Plus className="size-6" />
+          </Button>
+        ) : (
+          <Button className="gradient-primary text-white hover:opacity-90">
+            <Plus className="mr-2 size-4" />
+            Log meal
+          </Button>
+        )}
+      </SheetTrigger>
+
+      <SheetContent
+        side="bottom"
+        className="h-[92dvh] rounded-t-2xl p-0 sm:h-[90dvh]"
+      >
+        {/* Remounting on each open resets all internal state, so a previous
+            analysis never bleeds into the next entry. */}
+        {open && <LogMealForm onDone={() => setOpen(false)} />}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+type Stage = "input" | "review";
+
+function LogMealForm({ onDone }: { onDone: () => void }) {
+  const [stage, setStage] = useState<Stage>("input");
+  const [description, setDescription] = useState("");
+  const [caption, setCaption] = useState("");
+  const [image, setImage] = useState<string | null>(null);
+  const [mealTypeHint, setMealTypeHint] = useState<MealType | "auto">("auto");
+
+  const [analysis, setAnalysis] = useState<AnalyzeResponse | null>(null);
+  const [items, setItems] = useState<AnalyzedItem[]>([]);
+  const [mealName, setMealName] = useState("");
+  const [mealType, setMealType] = useState<MealType>("snack");
+  const [source, setSource] = useState<"text" | "photo">("text");
+
+  const fileInput = useRef<HTMLInputElement>(null);
+  const analyze = useAnalyzeMeal();
+  const save = useSaveMeal();
+
+  function applyAnalysis(result: AnalyzeResponse, from: "text" | "photo") {
+    setAnalysis(result);
+    setItems(result.items);
+    setMealName(result.name);
+    setMealType(mealTypeHint === "auto" ? result.mealType : mealTypeHint);
+    setSource(from);
+    setStage("review");
+  }
+
+  function handleAnalyzeText() {
+    analyze.mutate(
+      {
+        mode: "text",
+        description: description.trim(),
+        ...(mealTypeHint !== "auto" ? { mealTypeHint } : {}),
+      },
+      { onSuccess: (result) => applyAnalysis(result, "text") },
+    );
+  }
+
+  function handleAnalyzePhoto() {
+    if (!image) return;
+    analyze.mutate(
+      {
+        mode: "photo",
+        image,
+        ...(caption.trim() ? { caption: caption.trim() } : {}),
+        ...(mealTypeHint !== "auto" ? { mealTypeHint } : {}),
+      },
+      { onSuccess: (result) => applyAnalysis(result, "photo") },
+    );
+  }
+
+  function handleFile(file: File) {
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.error("That image is too large. Please pick one under 7MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") setImage(reader.result);
+    };
+    reader.onerror = () => toast.error("Could not read that image.");
+    reader.readAsDataURL(file);
+  }
+
+  function handleSave() {
+    save.mutate(
+      {
+        name: mealName.trim(),
+        mealType,
+        source,
+        rawInput: source === "text" ? description.trim() : caption.trim() || null,
+        notes: analysis?.notes ?? null,
+        aiConfidence: analysis?.confidence ?? null,
+        items,
+      },
+      { onSuccess: onDone },
+    );
+  }
+
+  const canSave = mealName.trim().length > 0 && items.length > 0;
+
+  return (
+    <div className="flex h-full flex-col">
+      <SheetHeader className="border-b px-5 py-4 text-left">
+        <SheetTitle>{stage === "input" ? "Log a meal" : "Check the estimate"}</SheetTitle>
+        <SheetDescription>
+          {stage === "input"
+            ? "Describe what you ate or take a photo — the AI estimates the nutrition."
+            : "These are estimates. Correct anything that looks off before saving."}
+        </SheetDescription>
+      </SheetHeader>
+
+      <div className="flex-1 overflow-y-auto px-5 py-4">
+        {stage === "input" ? (
+          <Tabs defaultValue="text" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="text">Text</TabsTrigger>
+              <TabsTrigger value="photo">Photo</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="text" className="mt-4 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="description">What did you eat?</Label>
+                <Textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Two scrambled eggs, a slice of sourdough with butter, and a flat white"
+                  rows={5}
+                  maxLength={2000}
+                  className="resize-none"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Quantities help — &ldquo;150g chicken&rdquo; beats
+                  &ldquo;some chicken&rdquo;.
+                </p>
+              </div>
+
+              <MealTypeSelect
+                value={mealTypeHint}
+                onChange={(v) => setMealTypeHint(v as MealType | "auto")}
+              />
+
+              <Button
+                className="gradient-primary w-full text-white hover:opacity-90"
+                disabled={description.trim().length < 2 || analyze.isPending}
+                onClick={handleAnalyzeText}
+              >
+                {analyze.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                    Analysing…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 size-4" />
+                    Analyse
+                  </>
+                )}
+              </Button>
+            </TabsContent>
+
+            <TabsContent value="photo" className="mt-4 space-y-4">
+              <input
+                ref={fileInput}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFile(file);
+                  // Reset so picking the same file twice still fires onChange.
+                  e.target.value = "";
+                }}
+              />
+
+              {image ? (
+                <div className="relative overflow-hidden rounded-xl border">
+                  {/* eslint-disable-next-line @next/next/no-img-element --
+                      the source is a client-side data URL, which next/image
+                      cannot optimise. */}
+                  <img
+                    src={image}
+                    alt="Meal preview"
+                    className="max-h-72 w-full object-cover"
+                  />
+                  <Button
+                    size="icon"
+                    variant="secondary"
+                    className="absolute right-2 top-2 size-8 rounded-full"
+                    onClick={() => setImage(null)}
+                    aria-label="Remove photo"
+                  >
+                    <X className="size-4" />
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInput.current?.click()}
+                  className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed py-12 text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                >
+                  <Camera className="size-8" />
+                  <span className="text-sm font-medium">Take or choose a photo</span>
+                  <span className="text-xs">JPEG, PNG, WebP or GIF · up to 7MB</span>
+                </button>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="caption">Anything to add? (optional)</Label>
+                <Textarea
+                  id="caption"
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  placeholder="Cooked in olive oil, large portion"
+                  rows={2}
+                  maxLength={500}
+                  className="resize-none"
+                />
+              </div>
+
+              <MealTypeSelect
+                value={mealTypeHint}
+                onChange={(v) => setMealTypeHint(v as MealType | "auto")}
+              />
+
+              <Button
+                className="gradient-primary w-full text-white hover:opacity-90"
+                disabled={!image || analyze.isPending}
+                onClick={handleAnalyzePhoto}
+              >
+                {analyze.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                    Analysing photo…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 size-4" />
+                    Analyse photo
+                  </>
+                )}
+              </Button>
+              <p className="text-center text-xs text-muted-foreground">
+                Photos are analysed and then discarded — nothing is stored.
+              </p>
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              {analysis && <ConfidenceBadge value={analysis.confidence} />}
+              <Badge variant="secondary">{items.length} items</Badge>
+            </div>
+
+            {analysis?.notes && (
+              <p className="rounded-lg bg-secondary/60 px-3 py-2 text-sm text-muted-foreground">
+                {analysis.notes}
+              </p>
+            )}
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="meal-name">Meal name</Label>
+                <input
+                  id="meal-name"
+                  value={mealName}
+                  onChange={(e) => setMealName(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
+              <MealTypeSelect
+                value={mealType}
+                onChange={(value) => setMealType(value as MealType)}
+                includeAuto={false}
+              />
+            </div>
+
+            <AnalyzedItemsEditor items={items} onChange={setItems} />
+          </div>
+        )}
+      </div>
+
+      {stage === "review" && (
+        <div className="flex gap-2 border-t px-5 py-4">
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={() => setStage("input")}
+            disabled={save.isPending}
+          >
+            Back
+          </Button>
+          <Button
+            className="gradient-primary flex-1 text-white hover:opacity-90"
+            onClick={handleSave}
+            disabled={!canSave || save.isPending}
+          >
+            {save.isPending ? (
+              <>
+                <Loader2 className="mr-2 size-4 animate-spin" />
+                Saving…
+              </>
+            ) : (
+              "Save meal"
+            )}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MealTypeSelect({
+  value,
+  onChange,
+  includeAuto = true,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  includeAuto?: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>Meal</Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {includeAuto && <SelectItem value="auto">Detect automatically</SelectItem>}
+          {MEAL_TYPES.map((type) => (
+            <SelectItem key={type} value={type} className="capitalize">
+              {type}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+/** Low confidence is worth flagging — it tells the user to check the numbers. */
+function ConfidenceBadge({ value }: { value: number }) {
+  const percent = Math.round(value * 100);
+  const level = value >= 0.7 ? "high" : value >= 0.4 ? "medium" : "low";
+
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "font-medium",
+        level === "high" && "border-success/40 text-success",
+        level === "medium" && "border-warning/40 text-warning",
+        level === "low" && "border-destructive/40 text-destructive",
+      )}
+    >
+      {percent}% confident
+    </Badge>
+  );
+}
+
