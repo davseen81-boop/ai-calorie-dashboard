@@ -90,14 +90,19 @@ export const callGemini: ProviderCall = async ({ system, text, image }) => {
     if (error instanceof AiAnalysisError) throw error;
 
     const message = error instanceof Error ? error.message : String(error);
-    // Free-tier keys hit quota routinely, so it's worth its own wording rather
-    // than a generic upstream failure.
+
+    // Free-tier keys hit quota routinely, so it gets its own wording.
     const rateLimited = /quota|rate limit|RESOURCE_EXHAUSTED|429/i.test(message);
+    // Google retires models for new accounts while still listing them for
+    // existing ones — without this, that reads as an unexplained outage.
+    const badModel = /not found|no longer available|NOT_FOUND|404/i.test(message);
 
     throw new AiAnalysisError(
       rateLimited
-        ? "Gemini's free-tier limit was hit. Wait a minute and try again."
-        : "Could not reach Gemini.",
+        ? "Gemini's rate limit was hit. Wait a minute and try again."
+        : badModel
+          ? `Gemini rejected the model "${model}". Set GEMINI_MODEL to one your account can use.`
+          : "Could not reach Gemini.",
       "upstream_error",
       message,
     );

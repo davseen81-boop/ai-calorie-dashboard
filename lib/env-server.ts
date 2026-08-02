@@ -103,7 +103,12 @@ const aiEnvSchema = z.object({
   // Google AI Studio — has a free tier and is multimodal, so photo analysis
   // works without a paid plan.
   GEMINI_API_KEY: z.string().min(1).optional(),
-  GEMINI_MODEL: z.string().min(1).default("gemini-2.5-flash"),
+  /**
+   * Google retires models for *new* accounts while keeping them listed for
+   * existing ones, so an older default silently 404s only for newer users.
+   * Keep this on a current model.
+   */
+  GEMINI_MODEL: z.string().min(1).default("gemini-3.6-flash"),
 
   // Retained so the provider can be switched back with one env var.
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
