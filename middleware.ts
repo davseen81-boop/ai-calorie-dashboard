@@ -64,6 +64,14 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Everything except Next internals and static files.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|fonts/|.*\\.(?:png|jpg|jpeg|svg|webp|ico)$).*)"],
+  /**
+   * Everything except Next internals and public assets.
+   *
+   * The web app manifest must be excluded explicitly: browsers fetch it before
+   * any session exists (and sometimes without credentials), so gating it makes
+   * the install prompt never appear.
+   */
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|fonts/|icons/|manifest.webmanifest|robots.txt|sitemap.xml|.*\\.(?:png|jpg|jpeg|svg|webp|ico|webmanifest)$).*)",
+  ],
 };
