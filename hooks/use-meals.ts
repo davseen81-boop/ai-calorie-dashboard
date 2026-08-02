@@ -223,7 +223,12 @@ export function useDeleteMeal() {
   });
 }
 
-export function useUpdateProfile() {
+/**
+ * @param silent suppresses both toasts. Used by background updates the user
+ *   didn't initiate — announcing them would be noise, and a failure is not
+ *   something they can act on.
+ */
+export function useUpdateProfile({ silent = false }: { silent?: boolean } = {}) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -231,11 +236,13 @@ export function useUpdateProfile() {
       api.patch<ApiProfile>("/api/profile", patch),
     onSuccess: (profile) => {
       queryClient.setQueryData(queryKeys.profile, profile);
-      // Goals feed the dashboard rings, so those summaries are now stale.
+      // Goals and timezone both feed the dashboard, so those summaries are
+      // now stale.
       void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      toast.success("Settings saved");
+      if (!silent) toast.success("Settings saved");
     },
     onError: (error) => {
+      if (silent) return;
       toast.error(
         error instanceof ApiRequestError ? error.message : "Could not save.",
       );

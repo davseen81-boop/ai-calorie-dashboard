@@ -1,11 +1,12 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Camera, Loader2, Plus, Sparkles, X } from "lucide-react";
+import { Camera, Loader2, PencilLine, Plus, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -85,7 +86,7 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
   const [items, setItems] = useState<AnalyzedItem[]>([]);
   const [mealName, setMealName] = useState("");
   const [mealType, setMealType] = useState<MealType>("snack");
-  const [source, setSource] = useState<"text" | "photo">("text");
+  const [source, setSource] = useState<"text" | "photo" | "manual">("text");
 
   const fileInput = useRef<HTMLInputElement>(null);
   const analyze = useAnalyzeMeal();
@@ -138,14 +139,31 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
     reader.readAsDataURL(file);
   }
 
+  /** Skip analysis entirely and go straight to the editor with a blank row. */
+  function startManual() {
+    setAnalysis(null);
+    setSource("manual");
+    setItems([
+      { name: "", quantity: 1, unit: "serving", calories: 0, proteinG: 0, carbsG: 0, fatG: 0 },
+    ]);
+    setStage("review");
+  }
+
   function handleSave() {
     save.mutate(
       {
         name: mealName.trim(),
         mealType,
         source,
-        rawInput: source === "text" ? description.trim() : caption.trim() || null,
+        rawInput:
+          source === "text"
+            ? description.trim()
+            : source === "photo"
+              ? caption.trim() || null
+              : null,
         notes: analysis?.notes ?? null,
+        // Null for manual entries, so the UI never shows a confidence badge
+        // for numbers the user typed themselves.
         aiConfidence: analysis?.confidence ?? null,
         items,
       },
@@ -153,25 +171,39 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
     );
   }
 
-  const canSave = mealName.trim().length > 0 && items.length > 0;
+  // Every item needs a name — the server rejects blanks, and catching it here
+  // means the user sees a disabled button rather than a 422 after saving.
+  const canSave =
+    mealName.trim().length > 0 &&
+    items.length > 0 &&
+    items.every((item) => item.name.trim().length > 0);
 
   return (
     <div className="flex h-full flex-col">
       <SheetHeader className="border-b px-5 py-4 text-left">
-        <SheetTitle>{stage === "input" ? "Log a meal" : "Check the estimate"}</SheetTitle>
+        <SheetTitle>
+          {stage === "input"
+            ? "Log a meal"
+            : source === "manual"
+              ? "Add the details"
+              : "Check the estimate"}
+        </SheetTitle>
         <SheetDescription>
           {stage === "input"
-            ? "Describe what you ate or take a photo — the AI estimates the nutrition."
-            : "These are estimates. Correct anything that looks off before saving."}
+            ? "Describe what you ate, take a photo, or enter it yourself."
+            : source === "manual"
+              ? "Add each food and its nutrition, then save."
+              : "These are estimates. Correct anything that looks off before saving."}
         </SheetDescription>
       </SheetHeader>
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
         {stage === "input" ? (
           <Tabs defaultValue="text" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="text">Text</TabsTrigger>
               <TabsTrigger value="photo">Photo</TabsTrigger>
+              <TabsTrigger value="manual">Manual</TabsTrigger>
             </TabsList>
 
             <TabsContent value="text" className="mt-4 space-y-4">
@@ -299,6 +331,44 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
               </Button>
               <p className="text-center text-xs text-muted-foreground">
                 Photos are analysed and then discarded — nothing is stored.
+              </p>
+            </TabsContent>
+
+            {/* No AI involved: the app stays fully usable when analysis is
+                unavailable, and this is the fallback when an estimate is
+                wrong enough that correcting it is slower than typing it. */}
+            <TabsContent value="manual" className="mt-4 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="manual-name">Meal name</Label>
+                <Input
+                  id="manual-name"
+                  value={mealName}
+                  onChange={(e) => setMealName(e.target.value)}
+                  placeholder="Chicken salad"
+                  maxLength={120}
+                />
+              </div>
+
+              <MealTypeSelect
+                value={mealTypeHint}
+                onChange={(v) => setMealTypeHint(v as MealType | "auto")}
+              />
+
+              <Button
+                variant="outline"
+                className="w-full"
+                disabled={mealName.trim().length === 0}
+                onClick={() => {
+                  if (mealTypeHint !== "auto") setMealType(mealTypeHint);
+                  startManual();
+                }}
+              >
+                <PencilLine className="mr-2 size-4" />
+                Enter nutrition myself
+              </Button>
+
+              <p className="text-center text-xs text-muted-foreground">
+                You&apos;ll add each food and its calories on the next step.
               </p>
             </TabsContent>
           </Tabs>

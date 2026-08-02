@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,21 @@ export function AnalyzedItemsEditor({ items, onChange }: Props) {
     onChange(items.filter((_, i) => i !== index));
   }
 
+  function addItem() {
+    onChange([
+      ...items,
+      {
+        name: "",
+        quantity: 1,
+        unit: "serving",
+        calories: 0,
+        proteinG: 0,
+        carbsG: 0,
+        fatG: 0,
+      },
+    ]);
+  }
+
   const totals = items.reduce(
     (acc, item) => ({
       calories: acc.calories + item.calories,
@@ -40,9 +55,15 @@ export function AnalyzedItemsEditor({ items, onChange }: Props) {
 
   if (items.length === 0) {
     return (
-      <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-        No items left. Add at least one before saving, or start over.
-      </p>
+      <div className="space-y-3 rounded-lg border border-dashed p-6 text-center">
+        <p className="text-sm text-muted-foreground">
+          No items yet — a meal needs at least one before it can be saved.
+        </p>
+        <Button type="button" variant="outline" size="sm" onClick={addItem}>
+          <Plus className="mr-2 size-4" />
+          Add an item
+        </Button>
+      </div>
     );
   }
 
@@ -108,6 +129,17 @@ export function AnalyzedItemsEditor({ items, onChange }: Props) {
           </div>
         </div>
       ))}
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="w-full"
+        onClick={addItem}
+      >
+        <Plus className="mr-2 size-4" />
+        Add another item
+      </Button>
 
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-secondary/60 px-4 py-3 text-sm">
         <span className="font-semibold">

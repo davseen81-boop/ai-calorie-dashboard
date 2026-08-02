@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/layout/app-shell";
+import { TimezoneSync } from "@/components/providers/timezone-sync";
 
 /** Wraps every signed-in-style page in the shared chrome. */
 export default function AppLayout({
@@ -6,5 +7,12 @@ export default function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <AppShell>{children}</AppShell>;
+  return (
+    <AppShell>
+      {/* Renders nothing; adopts the browser timezone on first run so "today"
+          is bucketed in the user's local day rather than UTC. */}
+      <TimezoneSync />
+      {children}
+    </AppShell>
+  );
 }

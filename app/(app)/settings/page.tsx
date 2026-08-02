@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, Monitor, Moon, Sun, X } from "lucide-react";
 import { useTheme } from "next-themes";
 
@@ -15,11 +15,23 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { QueryError } from "@/components/ui/query-states";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useProfile, useUpdateProfile } from "@/hooks/use-meals";
+import {
+  detectBrowserTimeZone,
+  listTimeZones,
+  timeZoneOffsetLabel,
+} from "@/lib/timezones";
 import type { Theme } from "@/lib/db/schema";
 
 const SUGGESTED_PREFERENCES = [
@@ -46,7 +58,12 @@ export default function SettingsPage() {
   const [fat, setFat] = useState(65);
   const [preferences, setPreferences] = useState<string[]>([]);
   const [customPreference, setCustomPreference] = useState("");
+  const [timezone, setTimezone] = useState("UTC");
   const [loaded, setLoaded] = useState(false);
+
+  // Computed once — the zone list is ~400 entries and never changes.
+  const zones = useMemo(listTimeZones, []);
+  const browserZone = useMemo(detectBrowserTimeZone, []);
 
   // Seed the controls once the profile arrives. Guarded so a background
   // refetch can't overwrite edits the user is midway through.
@@ -57,8 +74,24 @@ export default function SettingsPage() {
     setCarbs(profile.data.carbsGoalG);
     setFat(profile.data.fatGoalG);
     setPreferences(profile.data.dietaryPreferences);
+    setTimezone(profile.data.timezone);
     setLoaded(true);
   }, [profile.data, loaded]);
+
+  // Recomputed on render so it reflects the zone currently selected, giving
+  // immediate feedback that the choice is the intended one.
+  const localNow = useMemo(() => {
+    try {
+      return new Intl.DateTimeFormat("en-GB", {
+        timeZone: timezone,
+        weekday: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(new Date());
+    } catch {
+      return "—";
+    }
+  }, [timezone]);
 
   if (profile.isPending) {
     return (
@@ -239,6 +272,61 @@ export default function SettingsPage() {
               ),
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Timezone</CardTitle>
+          <CardDescription>
+            Decides which day a meal counts towards. Detected automatically on
+            first run — change it if you travel or it guessed wrong.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Select
+            value={timezone}
+            onValueChange={(value) => {
+              setTimezone(value);
+              update.mutate({ timezone: value });
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="max-h-72">
+              {zones.map((zone) => (
+                <SelectItem key={zone} value={zone}>
+                  {zone.replace(/_/g, " ")}
+                  <span className="ml-2 text-muted-foreground">
+                    {timeZoneOffsetLabel(zone)}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <p className="text-sm text-muted-foreground">
+            Your local time is{" "}
+            <span className="font-medium tabular-nums text-foreground">
+              {localNow}
+            </span>
+            {timezone !== browserZone && (
+              <>
+                {" — "}
+                <button
+                  type="button"
+                  className="font-medium text-primary underline underline-offset-2"
+                  onClick={() => {
+                    setTimezone(browserZone);
+                    update.mutate({ timezone: browserZone });
+                  }}
+                >
+                  use this device&apos;s zone ({browserZone.replace(/_/g, " ")})
+                </button>
+              </>
+            )}
+          </p>
         </CardContent>
       </Card>
 
