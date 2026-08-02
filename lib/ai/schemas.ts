@@ -52,6 +52,82 @@ export type MealAnalysis = z.infer<typeof mealAnalysisSchema>;
  * (`minimum`, `maxLength`, …) are not supported — optionality is expressed by
  * allowing an empty value, not by omitting a key. Range checking is Zod's job.
  */
+/**
+ * The same contract in Gemini's schema dialect.
+ *
+ * Gemini accepts only a subset of JSON Schema and **rejects
+ * `additionalProperties`**, so this cannot simply reuse the schema above.
+ * `propertyOrdering` is honoured by Gemini and keeps generation stable.
+ *
+ * Kept adjacent to its sibling deliberately: if one gains a field and the
+ * other doesn't, the Zod parse fails loudly rather than silently dropping it.
+ */
+export const mealAnalysisGeminiSchema = {
+  type: "object",
+  required: ["is_food", "meal_name", "meal_type", "confidence", "items", "notes"],
+  propertyOrdering: [
+    "is_food",
+    "meal_name",
+    "meal_type",
+    "confidence",
+    "items",
+    "notes",
+  ],
+  properties: {
+    is_food: {
+      type: "boolean",
+      description: "false if the input is not food (e.g. a photo of a car)",
+    },
+    meal_name: {
+      type: "string",
+      description: "Short human label for the whole meal, e.g. 'Chicken salad'",
+    },
+    meal_type: { type: "string", enum: [...MEAL_TYPES] },
+    confidence: {
+      type: "number",
+      description: "0 to 1. Lower it when portion sizes are ambiguous.",
+    },
+    items: {
+      type: "array",
+      description: "One entry per distinct food. Empty when is_food is false.",
+      items: {
+        type: "object",
+        required: [
+          "name",
+          "quantity",
+          "unit",
+          "calories",
+          "protein_g",
+          "carbs_g",
+          "fat_g",
+        ],
+        propertyOrdering: [
+          "name",
+          "quantity",
+          "unit",
+          "calories",
+          "protein_g",
+          "carbs_g",
+          "fat_g",
+        ],
+        properties: {
+          name: { type: "string" },
+          quantity: { type: "number" },
+          unit: { type: "string", description: "g, ml, slice, cup, serving…" },
+          calories: { type: "number", description: "kcal for the full quantity" },
+          protein_g: { type: "number" },
+          carbs_g: { type: "number" },
+          fat_g: { type: "number" },
+        },
+      },
+    },
+    notes: {
+      type: "string",
+      description: "Assumptions or caveats. Empty string when none.",
+    },
+  },
+} as const;
+
 export const mealAnalysisJsonSchema = {
   type: "object",
   additionalProperties: false,

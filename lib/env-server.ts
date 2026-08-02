@@ -85,26 +85,39 @@ export const dbEnv = lazyEnv(
 );
 
 // ---------------------------------------------------------------------------
-// Anthropic
+// AI provider
 // ---------------------------------------------------------------------------
 
+/**
+ * Both providers are optional at the schema level, and the *selected* one is
+ * checked at call time instead.
+ *
+ * Requiring the key here would make a missing key a hard validation failure at
+ * first access, which reads as a crash. The provider raises a typed
+ * `not_configured` error instead, so the app stays usable (manual entry) and
+ * the UI can explain what to add.
+ */
 const aiEnvSchema = z.object({
-  ANTHROPIC_API_KEY: z
-    .string()
-    .min(1, "required before meal analysis will work"),
-  /**
-   * One model covers both modes — Claude is natively multimodal, so text and
-   * photo analysis run through the same model rather than two separate ones.
-   * Configurable so it can be swapped without a code change.
-   */
+  AI_PROVIDER: z.enum(["gemini", "anthropic"]).default("gemini"),
+
+  // Google AI Studio — has a free tier and is multimodal, so photo analysis
+  // works without a paid plan.
+  GEMINI_API_KEY: z.string().min(1).optional(),
+  GEMINI_MODEL: z.string().min(1).default("gemini-2.5-flash"),
+
+  // Retained so the provider can be switched back with one env var.
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
   ANTHROPIC_MODEL: z.string().min(1).default("claude-opus-5"),
 });
 
 export const aiEnv = lazyEnv(
   aiEnvSchema,
   () => ({
+    AI_PROVIDER: emptyToUndefined(process.env.AI_PROVIDER),
+    GEMINI_API_KEY: emptyToUndefined(process.env.GEMINI_API_KEY),
+    GEMINI_MODEL: emptyToUndefined(process.env.GEMINI_MODEL),
     ANTHROPIC_API_KEY: emptyToUndefined(process.env.ANTHROPIC_API_KEY),
     ANTHROPIC_MODEL: emptyToUndefined(process.env.ANTHROPIC_MODEL),
   }),
-  "Anthropic",
+  "AI provider",
 );

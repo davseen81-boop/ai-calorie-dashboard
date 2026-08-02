@@ -14,7 +14,7 @@ reshaping the data.
 | Framework | Next.js 14 (App Router), React 18, TypeScript (strict) |
 | UI | Tailwind CSS v3, shadcn/ui, Recharts, lucide-react |
 | Data | SQLite via libSQL + Drizzle ORM |
-| AI | Anthropic Claude (`claude-opus-5`), text + vision |
+| AI | Google Gemini (free tier) or Anthropic Claude — one env var switches |
 | State | TanStack Query v5 |
 
 ## Setup
@@ -29,9 +29,24 @@ Copy the environment template and fill it in:
 cp .env.example .env.local
 ```
 
-`ANTHROPIC_API_KEY` is the only value you must supply for AI analysis — get one
-from [console.anthropic.com](https://console.anthropic.com/settings/keys).
+`GEMINI_API_KEY` is the only value you must supply for AI analysis — it's free
+and needs no card: [aistudio.google.com/apikey](https://aistudio.google.com/apikey).
 `DATABASE_URL` already defaults to a local SQLite file.
+
+### Switching AI provider
+
+Set `AI_PROVIDER` to `gemini` (default) or `anthropic`; only that provider's
+key is required. Prompts, schema validation and error handling are shared, so
+switching is one env var rather than a code change.
+
+| | Gemini | Claude |
+|---|---|---|
+| Cost | Free tier, no card | Prepaid credits (~$0.01–0.05 per meal) |
+| Photos | ✅ | ✅ |
+| Privacy | Free tier may use your data for training | Not used for training |
+
+Note a Claude.ai subscription does **not** include API access — that's billed
+separately at [console.anthropic.com](https://console.anthropic.com).
 
 Create the database:
 

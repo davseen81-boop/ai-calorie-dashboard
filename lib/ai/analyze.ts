@@ -1,70 +1,27 @@
 import "server-only";
 
-import Anthropic from "@anthropic-ai/sdk";
-
 import { aiEnv } from "@/lib/env-server";
-import {
-  mealAnalysisJsonSchema,
-  mealAnalysisSchema,
-  type MealAnalysis,
-} from "./schemas";
+import { AiAnalysisError } from "./errors";
+import { mealAnalysisSchema, type MealAnalysis } from "./schemas";
 import {
   TEXT_ANALYSIS_PROMPT,
   VISION_ANALYSIS_PROMPT,
   buildUserContext,
 } from "./prompts";
+import { callGemini } from "./providers/gemini";
+import { callAnthropic } from "./providers/anthropic";
+import type { ProviderCall, ProviderRequest } from "./providers/types";
 
-/** Distinguishes "the model misbehaved" from "the network broke". */
-export class AiAnalysisError extends Error {
-  constructor(
-    message: string,
-    readonly code:
-      | "invalid_response"
-      | "upstream_error"
-      | "not_configured"
-      | "refused"
-      | "not_food"
-      | "empty_result",
-    readonly details?: unknown,
-  ) {
-    super(message);
-    this.name = "AiAnalysisError";
-  }
-}
-
-let client: Anthropic | null = null;
-
-interface AiConfig {
-  apiKey: string;
-  model: string;
-}
+export { AiAnalysisError };
 
 /**
- * Read the Anthropic settings, converting a missing key into a typed error.
+ * Provider dispatch.
  *
- * Must be called inside the caller's try block: reading `aiEnv` triggers
- * validation, and an unconverted throw here would surface to the user as a
- * generic 500 instead of "AI analysis is not configured".
+ * The prompts, schema, validation and error handling are shared — swapping
+ * providers is one env var, not a code change.
  */
-function getAiConfig(): AiConfig {
-  try {
-    return { apiKey: aiEnv.ANTHROPIC_API_KEY, model: aiEnv.ANTHROPIC_MODEL };
-  } catch (error) {
-    // Deliberately environment-agnostic: this message reaches users on the
-    // deployed site too, where advice to edit .env.local is meaningless.
-    throw new AiAnalysisError(
-      "AI analysis isn't set up yet — ANTHROPIC_API_KEY is missing.",
-      "not_configured",
-      error instanceof Error ? error.message : undefined,
-    );
-  }
-}
-
-function getClient(apiKey: string): Anthropic {
-  // Lazy so that importing this module does not require ANTHROPIC_API_KEY —
-  // routes that never analyse a meal should not fail to load.
-  client ??= new Anthropic({ apiKey });
-  return client;
+function getProvider(): ProviderCall {
+  return aiEnv.AI_PROVIDER === "anthropic" ? callAnthropic : callGemini;
 }
 
 export interface AnalyzeContext {
@@ -74,11 +31,11 @@ export interface AnalyzeContext {
 }
 
 /**
- * Shared post-processing for both modes.
+ * Shared post-processing.
  *
- * Structured outputs make the JSON well-formed, but the content still has to be
- * checked: Zod catches out-of-range numbers, and `is_food: false` is a
- * successful call that the caller must still treat as a failure to log.
+ * A response schema makes the JSON well-formed, but the content still has to
+ * be checked: Zod catches out-of-range numbers, and `is_food: false` is a
+ * successful call the caller must still treat as a failure to log.
  */
 function parseAnalysis(raw: string | null | undefined): MealAnalysis {
   if (!raw) {
@@ -119,118 +76,35 @@ function parseAnalysis(raw: string | null | undefined): MealAnalysis {
   return parsed.data;
 }
 
-/**
- * Effort tuning.
- *
- * Claude Opus 5 performs strongly at low effort, and both modes are scoped
- * extraction tasks rather than open-ended reasoning. Photo analysis gets a step
- * up because judging portion size from visual references is the harder half.
- *
- * Thinking is deliberately left at its default (on): disabling it on this model
- * is the more expensive lever, and low effort already provides the saving.
- */
-const TEXT_EFFORT = "low" as const;
-const VISION_EFFORT = "medium" as const;
-
-/** Wraps SDK failures so callers see one error type. */
-async function callModel(
-  config: AiConfig,
-  effort: "low" | "medium" | "high",
-  system: string,
-  content: Anthropic.ContentBlockParam[],
-): Promise<string | null> {
-  let message: Anthropic.Message;
-
-  try {
-    message = await getClient(config.apiKey).messages.create({
-      model: config.model,
-      // Generous because `max_tokens` caps thinking *plus* the response text;
-      // the JSON itself is small, but a tight cap would truncate mid-object.
-      max_tokens: 16000,
-      system,
-      messages: [{ role: "user", content }],
-      output_config: {
-        effort,
-        // Constrains the response to the schema, so the JSON is well-formed by
-        // construction. Zod still re-checks the values — see ./schemas.ts.
-        format: { type: "json_schema", schema: mealAnalysisJsonSchema },
-      },
-    });
-  } catch (error) {
-    if (error instanceof Anthropic.APIError) {
-      throw new AiAnalysisError(
-        error.status === 429
-          ? "Rate limited by Anthropic. Try again in a moment."
-          : `Anthropic request failed (${error.status ?? "network"}).`,
-        "upstream_error",
-        error.message,
-      );
-    }
-    throw new AiAnalysisError(
-      "Could not reach Anthropic.",
-      "upstream_error",
-      error instanceof Error ? error.message : String(error),
-    );
-  }
-
-  // Safety classifiers can decline a request; that arrives as a normal 200
-  // with an empty or partial `content`, so it must be checked before reading.
-  if (message.stop_reason === "refusal") {
-    throw new AiAnalysisError(
-      "The request was declined by Anthropic's safety systems.",
-      "refused",
-      message.stop_details,
-    );
-  }
-
-  if (message.stop_reason === "max_tokens") {
-    throw new AiAnalysisError(
-      "The analysis was cut off before it finished.",
-      "invalid_response",
-    );
-  }
-
-  // `content` is a union of block types; only text carries the JSON.
-  const text = message.content
-    .filter((block): block is Anthropic.TextBlock => block.type === "text")
-    .map((block) => block.text)
-    .join("");
-
-  return text || null;
-}
-
 /** Estimate nutrition from a written description. */
 export async function analyzeMealText(
   description: string,
   context: AnalyzeContext,
 ): Promise<MealAnalysis> {
-  const config = getAiConfig();
   const userContext = buildUserContext(context);
 
-  const raw = await callModel(
-    config,
-    TEXT_EFFORT,
-    userContext
+  const request: ProviderRequest = {
+    system: userContext
       ? `${TEXT_ANALYSIS_PROMPT}\n\n${userContext}`
       : TEXT_ANALYSIS_PROMPT,
-    [{ type: "text", text: description }],
-  );
+    text: description,
+  };
 
-  return parseAnalysis(raw);
+  return parseAnalysis(await getProvider()(request));
 }
 
-/** Media types Claude accepts for image blocks. */
-type ImageMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+/** Media types every supported provider accepts. */
+const ALLOWED_IMAGE_TYPES = ["jpeg", "png", "gif", "webp"] as const;
 
 /**
- * Split a `data:image/png;base64,…` URL into the parts the API wants.
+ * Split a `data:image/png;base64,…` URL into its parts.
  *
  * The route has already validated the shape, so a failure here means the
  * contract between validation and this function drifted.
  */
 function parseImageDataUrl(dataUrl: string): {
-  mediaType: ImageMediaType;
-  data: string;
+  mediaType: string;
+  base64: string;
 } {
   const match = /^data:image\/(jpeg|jpg|png|webp|gif);base64,(.+)$/.exec(dataUrl);
   if (!match) {
@@ -240,52 +114,40 @@ function parseImageDataUrl(dataUrl: string): {
     );
   }
 
-  const [, subtype, data] = match;
-  // `image/jpg` is a common but non-standard spelling the API rejects.
-  const mediaType = (subtype === "jpg" ? "jpeg" : subtype) as
-    | "jpeg"
-    | "png"
-    | "webp"
-    | "gif";
+  const [, subtype, base64] = match;
+  // `image/jpg` is a common but non-standard spelling that APIs reject.
+  const normalised = subtype === "jpg" ? "jpeg" : subtype;
+  const mediaType = ALLOWED_IMAGE_TYPES.includes(
+    normalised as (typeof ALLOWED_IMAGE_TYPES)[number],
+  )
+    ? `image/${normalised}`
+    : "image/jpeg";
 
-  return { mediaType: `image/${mediaType}`, data };
+  return { mediaType, base64 };
 }
 
 /**
  * Estimate nutrition from a photo.
  *
  * `imageDataUrl` must be a full data URL — the route validates the prefix and
- * size before this is called.
+ * size before this is called. The image is never persisted.
  */
 export async function analyzeMealPhoto(
   imageDataUrl: string,
   context: AnalyzeContext & { caption?: string },
 ): Promise<MealAnalysis> {
-  const config = getAiConfig();
   const userContext = buildUserContext(context);
-  const { mediaType, data } = parseImageDataUrl(imageDataUrl);
+  const image = parseImageDataUrl(imageDataUrl);
 
-  const raw = await callModel(
-    config,
-    VISION_EFFORT,
-    userContext
+  const request: ProviderRequest = {
+    system: userContext
       ? `${VISION_ANALYSIS_PROMPT}\n\n${userContext}`
       : VISION_ANALYSIS_PROMPT,
-    [
-      // Image first: the model attends better when the picture precedes the
-      // instruction that refers to it.
-      {
-        type: "image",
-        source: { type: "base64", media_type: mediaType, data },
-      },
-      {
-        type: "text",
-        text: context.caption?.trim()
-          ? `Analyse this meal. The user adds: ${context.caption.trim()}`
-          : "Analyse this meal photo.",
-      },
-    ],
-  );
+    text: context.caption?.trim()
+      ? `Analyse this meal. The user adds: ${context.caption.trim()}`
+      : "Analyse this meal photo.",
+    image,
+  };
 
-  return parseAnalysis(raw);
+  return parseAnalysis(await getProvider()(request));
 }
