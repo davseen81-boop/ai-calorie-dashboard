@@ -14,6 +14,20 @@ export const metadata: Metadata = {
   title: "Calorie Dashboard",
   description:
     "Log meals by description or photo and track calories and macros.",
+  applicationName: "Calorie Dashboard",
+  appleWebApp: {
+    // Lets iOS run it fullscreen from the home screen, like Android does
+    // from the manifest.
+    capable: true,
+    title: "Calories",
+    statusBarStyle: "default",
+  },
+  icons: {
+    icon: "/icons/icon-192.png",
+    apple: "/icons/apple-touch-icon.png",
+  },
+  // Stops iOS turning numbers in meal names into phone links.
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
@@ -21,6 +35,11 @@ export const viewport: Viewport = {
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
     { media: "(prefers-color-scheme: dark)", color: "#0a0f1e" },
   ],
+  // Installed apps should feel native: no pinch-zoom on chrome, and content
+  // extends into the notch area.
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
