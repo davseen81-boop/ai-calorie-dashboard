@@ -67,20 +67,41 @@ writes are lost on every cold start and each instance gets its own copy. Use
 [Turso](https://turso.tech) instead — it is the same SQLite engine reachable
 over HTTP, so no code changes are needed.
 
-```bash
-turso db create calorie-dashboard
-```
+### 1. Create the database
+
+> **On Windows, use the web dashboard.** The Turso CLI runs under WSL only, so
+> the commands in Turso's own quickstart will not work in PowerShell.
+
+At [app.turso.tech](https://app.turso.tech):
+
+1. Create a database (any name, e.g. `calorie-dashboard`)
+2. Copy its **URL** — it looks like `libsql://calorie-dashboard-<org>.turso.io`
+3. Create a **token** for it and copy that too
+
+On macOS or Linux the CLI equivalents are `turso db create calorie-dashboard`
+and `turso db tokens create calorie-dashboard`.
+
+### 2. Create the tables
+
+Point your local `.env.local` at the remote database and push the schema —
+this uses the libSQL HTTP client, so no Turso CLI is involved:
 
 ```bash
-turso db tokens create calorie-dashboard
+npm run db:push
 ```
 
-Set these in Vercel's environment settings, then run `npm run db:push` against
-the remote database once before deploying:
+Then set `DATABASE_URL` back to `file:./local.db` if you want to keep
+developing against the local file.
 
-- `DATABASE_URL` — the `libsql://…turso.io` URL
-- `DATABASE_AUTH_TOKEN` — the token from the command above
-- `ANTHROPIC_API_KEY`
+### 3. Configure Vercel
+
+Add three environment variables in the Vercel project settings:
+
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | the `libsql://…turso.io` URL |
+| `DATABASE_AUTH_TOKEN` | the token from step 1 |
+| `ANTHROPIC_API_KEY` | your Anthropic key |
 
 Both `drizzle.config.ts` and `lib/db/index.ts` switch on the URL scheme, so
 local and production run identical code.
