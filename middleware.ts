@@ -12,7 +12,14 @@ import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth/token";
  */
 
 const PUBLIC_PAGES = ["/login", "/signup"];
-const PUBLIC_APIS = ["/api/auth/login", "/api/auth/signup", "/api/auth/logout"];
+const PUBLIC_APIS = [
+  "/api/auth/login",
+  "/api/auth/signup",
+  "/api/auth/logout",
+  "/api/auth/config",
+  // The whole Google flow, including the callback Google redirects back to.
+  "/api/auth/google",
+];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;

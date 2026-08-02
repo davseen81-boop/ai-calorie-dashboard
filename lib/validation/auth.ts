@@ -23,6 +23,8 @@ export const signupSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
   displayName: z.string().trim().max(80).optional(),
+  /** Only checked when SIGNUP_INVITE_CODE is set on the server. */
+  inviteCode: z.string().trim().max(200).optional(),
 });
 
 export const loginSchema = z.object({

@@ -129,8 +129,89 @@ export async function verifyCredentials(
   const user = await findUserByEmail(email);
   if (!user) return null;
 
+  // A Google-only account has no password to check. Falling through would
+  // compare against null and throw.
+  if (!user.passwordHash) return null;
+
   const valid = await verifyPassword(password, user.passwordHash);
   return valid ? user : null;
+}
+
+export async function findUserByGoogleId(
+  googleId: string,
+): Promise<UserRow | null> {
+  const row = await db.query.users.findFirst({
+    where: eq(users.googleId, googleId),
+  });
+  return row ?? null;
+}
+
+/**
+ * Find or create the account behind a verified Google identity.
+ *
+ * Three cases, in order:
+ *  1. Already linked by Google id — sign in.
+ *  2. Same email as an existing password account — link it, so signing in with
+ *     Google reaches the same data rather than silently creating a duplicate.
+ *     Safe only because the email is verified by Google.
+ *  3. Nobody — create, if `allowCreate`.
+ *
+ * Returns null when creation is needed but not allowed, which is how the
+ * invite gate is enforced for Google sign-ups.
+ */
+export async function findOrCreateGoogleUser(
+  identity: {
+    googleId: string;
+    email: string;
+    name: string | null;
+    picture: string | null;
+  },
+  options: { allowCreate: boolean },
+): Promise<{ user: UserRow; created: boolean } | null> {
+  const linked = await findUserByGoogleId(identity.googleId);
+  if (linked) return { user: linked, created: false };
+
+  const byEmail = await findUserByEmail(identity.email);
+  if (byEmail) {
+    const [updated] = await db
+      .update(users)
+      .set({
+        googleId: identity.googleId,
+        displayName: byEmail.displayName ?? identity.name,
+        avatarUrl: byEmail.avatarUrl ?? identity.picture,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, byEmail.id))
+      .returning();
+    return { user: updated, created: false };
+  }
+
+  if (!options.allowCreate) return null;
+
+  const id = crypto.randomUUID();
+  const isFirstUser = (await countUsers()) === 0;
+
+  await db.insert(users).values({
+    id,
+    email: identity.email,
+    passwordHash: null,
+    googleId: identity.googleId,
+    displayName: identity.name,
+    avatarUrl: identity.picture,
+  });
+
+  if (isFirstUser) {
+    await adoptLegacyData(id);
+  } else {
+    await db
+      .insert(profiles)
+      .values({ id, displayName: identity.name })
+      .onConflictDoNothing();
+  }
+
+  const created = await db.query.users.findFirst({ where: eq(users.id, id) });
+  if (!created) throw new Error("User vanished immediately after creation");
+  return { user: created, created: true };
 }
 
 export async function getUserById(id: string): Promise<UserRow | null> {

@@ -71,9 +71,17 @@ export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   /** Stored lowercased and trimmed; the uniqueness guarantee depends on it. */
   email: text("email").notNull().unique(),
-  /** scrypt, as `salt:derivedKey` in hex. Never the password itself. */
-  passwordHash: text("password_hash").notNull(),
+  /**
+   * scrypt, as `salt:derivedKey` in hex. Never the password itself.
+   *
+   * Null for accounts created through Google — they have no password, and a
+   * placeholder would be worse than an explicit absence.
+   */
+  passwordHash: text("password_hash"),
+  /** Google's stable subject id. Null for password accounts. */
+  googleId: text("google_id").unique(),
   displayName: text("display_name"),
+  avatarUrl: text("avatar_url"),
   ...timestamps,
 });
 
