@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { QueryError } from "@/components/ui/query-states";
+import { BmrCalculator } from "@/components/settings/bmr-calculator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useProfile, useUpdateProfile } from "@/hooks/use-meals";
@@ -138,6 +139,23 @@ export default function SettingsPage() {
           Targets and preferences used across the dashboard and by the AI.
         </p>
       </header>
+
+      {/* Offered before the manual sliders: most people don't know what their
+          target should be, and guessing with a slider is worse than a formula. */}
+      <BmrCalculator
+        profile={profile.data}
+        saving={update.isPending}
+        onSaveMetrics={(metrics) => update.mutate(metrics)}
+        onApply={(goals) => {
+          // Mirror into local state so the sliders move with it, rather than
+          // silently disagreeing with the target just applied.
+          setCalories(goals.dailyCalorieGoal);
+          setProtein(goals.proteinGoalG);
+          setCarbs(goals.carbsGoalG);
+          setFat(goals.fatGoalG);
+          update.mutate(goals);
+        }}
+      />
 
       <Card>
         <CardHeader>

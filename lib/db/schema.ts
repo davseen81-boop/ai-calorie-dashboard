@@ -28,6 +28,19 @@ export const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"] as const;
 export const MEAL_SOURCES = ["text", "photo", "manual"] as const;
 export const THEMES = ["light", "dark", "system"] as const;
 
+/** The two values the Mifflin-St Jeor equation is defined for. */
+export const BIOLOGICAL_SEXES = ["male", "female"] as const;
+
+export const ACTIVITY_LEVELS = [
+  "sedentary",
+  "light",
+  "moderate",
+  "active",
+  "very_active",
+] as const;
+
+export const GOAL_TYPES = ["lose", "maintain", "gain"] as const;
+
 const timestamps = {
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
@@ -63,6 +76,21 @@ export const profiles = sqliteTable("profiles", {
   timezone: text("timezone").notNull().default("UTC"),
 
   theme: text("theme", { enum: THEMES }).notNull().default("system"),
+
+  /**
+   * Body metrics for the BMR/TDEE estimate. All nullable — the calculator is
+   * optional, and the manual calorie slider works without any of them.
+   *
+   * `sex` is the biological sex the Mifflin-St Jeor equation is defined for;
+   * it is used for nothing else.
+   */
+  sex: text("sex", { enum: BIOLOGICAL_SEXES }),
+  /** Snapshot rather than a birth date: a year's drift is ~5 kcal. */
+  age: integer("age"),
+  heightCm: real("height_cm"),
+  weightKg: real("weight_kg"),
+  activityLevel: text("activity_level", { enum: ACTIVITY_LEVELS }),
+  goalType: text("goal_type", { enum: GOAL_TYPES }),
 
   ...timestamps,
 });
@@ -293,6 +321,9 @@ export type NewMealItemRow = typeof mealItems.$inferInsert;
 export type MealType = (typeof MEAL_TYPES)[number];
 export type MealSource = (typeof MEAL_SOURCES)[number];
 export type Theme = (typeof THEMES)[number];
+export type BiologicalSex = (typeof BIOLOGICAL_SEXES)[number];
+export type ActivityLevel = (typeof ACTIVITY_LEVELS)[number];
+export type GoalType = (typeof GOAL_TYPES)[number];
 
 /** A meal joined with its items — the shape the API returns. */
 export type MealWithItems = MealRow & { items: MealItemRow[] };

@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import { THEMES } from "@/lib/db/schema";
+import {
+  ACTIVITY_LEVELS,
+  BIOLOGICAL_SEXES,
+  GOAL_TYPES,
+  THEMES,
+} from "@/lib/db/schema";
 
 /**
  * PATCH /api/profile
@@ -23,6 +28,16 @@ export const updateProfileSchema = z
       .refine(isValidTimeZone, "Not a recognised IANA timezone")
       .optional(),
     theme: z.enum(THEMES).optional(),
+
+    // Body metrics for the BMR estimate. Bounds are physiological sanity
+    // checks, not clinical limits — they exist so a typo can't produce a
+    // nonsensical calorie target.
+    sex: z.enum(BIOLOGICAL_SEXES).nullish(),
+    age: z.number().int().min(13).max(120).nullish(),
+    heightCm: z.number().min(90).max(250).nullish(),
+    weightKg: z.number().min(25).max(400).nullish(),
+    activityLevel: z.enum(ACTIVITY_LEVELS).nullish(),
+    goalType: z.enum(GOAL_TYPES).nullish(),
   })
   .refine((v) => Object.keys(v).length > 0, {
     message: "Provide at least one field to update.",
