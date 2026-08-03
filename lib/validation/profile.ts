@@ -38,6 +38,7 @@ export const updateProfileSchema = z
     weightKg: z.number().min(25).max(400).nullish(),
     activityLevel: z.enum(ACTIVITY_LEVELS).nullish(),
     goalType: z.enum(GOAL_TYPES).nullish(),
+    adjustTargetForExercise: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, {
     message: "Provide at least one field to update.",

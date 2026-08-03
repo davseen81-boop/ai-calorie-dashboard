@@ -7,7 +7,9 @@ import { meals } from "./schema";
 import { dayRangeInZone, recentDayRanges } from "@/lib/date";
 import { getOrCreateProfile } from "./queries";
 import { listMeals } from "./queries";
-import type { MealWithItems } from "./schema";
+import { listExercise, sumExerciseCalories } from "./exercise";
+import { buildAdvice, type TargetAdvice } from "@/lib/nutrition/exercise";
+import type { ExerciseEntryRow, MealWithItems } from "./schema";
 
 /** Aggregates backing /api/dashboard/today and /api/dashboard/weekly. */
 
@@ -35,6 +37,16 @@ export interface TodaySummary {
   /** 0..1+, uncapped so the ring can show an overshoot. */
   goalProgress: number;
   meals: MealWithItems[];
+  exercise: {
+    entries: ExerciseEntryRow[];
+    /** Net calories burned today. */
+    caloriesBurned: number;
+    /** Whether those calories were added to the target. */
+    adjustsTarget: boolean;
+    /** The profile's goal before exercise. */
+    baseGoal: number;
+  };
+  advice: TargetAdvice;
 }
 
 /** Sum the `total_*` columns over a half-open instant range. */
@@ -100,8 +112,19 @@ export async function getTodaySummary(
     fatG: round(summed.fatG),
   };
 
+  const [exerciseEntries, burned] = await Promise.all([
+    listExercise({ from: start, to: end }, userId),
+    sumExerciseCalories(start, end, userId),
+  ]);
+
+  const adjustsTarget = profile.adjustTargetForExercise;
+  const baseGoal = profile.dailyCalorieGoal;
+
+  // Exercise raises the calorie target only. Macro goals are left alone: a
+  // 300 kcal run doesn't change how much protein the day needs, and scaling
+  // them would silently move three targets the user never set.
   const goals: DailyGoals = {
-    calories: profile.dailyCalorieGoal,
+    calories: baseGoal + (adjustsTarget ? burned : 0),
     proteinG: profile.proteinGoalG,
     carbsG: profile.carbsGoalG,
     fatG: profile.fatGoalG,
@@ -117,6 +140,22 @@ export async function getTodaySummary(
     // database could still contain.
     goalProgress: goals.calories > 0 ? consumed.calories / goals.calories : 0,
     meals: todaysMeals,
+    exercise: {
+      entries: exerciseEntries,
+      caloriesBurned: burned,
+      adjustsTarget,
+      baseGoal,
+    },
+    advice: buildAdvice({
+      consumed: consumed.calories,
+      baseGoal,
+      exerciseBurned: adjustsTarget ? burned : 0,
+      adjustedGoal: goals.calories,
+      hoursLeftInDay: Math.max(
+        0,
+        (end.getTime() - now.getTime()) / (60 * 60 * 1000),
+      ),
+    }),
   };
 }
 

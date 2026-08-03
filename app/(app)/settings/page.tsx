@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Monitor, Moon, Sun, X } from "lucide-react";
+import { Info, Loader2, Monitor, Moon, Sun, X } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { QueryError } from "@/components/ui/query-states";
 import { BmrCalculator } from "@/components/settings/bmr-calculator";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -290,6 +291,65 @@ export default function SettingsPage() {
               ),
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Exercise</CardTitle>
+          <CardDescription>
+            How logged workouts affect the day&apos;s calorie target.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+            <div>
+              <p className="text-sm font-medium">
+                Add exercise calories to my target
+              </p>
+              <p className="text-xs text-muted-foreground">
+                A 300 kcal workout raises today&apos;s target to{" "}
+                {(profile.data.dailyCalorieGoal + 300).toLocaleString()}.
+              </p>
+            </div>
+            <Switch
+              checked={profile.data.adjustTargetForExercise}
+              onCheckedChange={(on) =>
+                update.mutate({ adjustTargetForExercise: on })
+              }
+            />
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Genuinely a matter of preference. Eating back what you burn helps
+            fuel training; leaving it off keeps a steadier deficit, which some
+            people prefer because burn estimates — from any app or watch — tend
+            to read high. Either way the workout is still recorded.
+          </p>
+
+          {!profile.data.weightKg && (
+            <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
+              Exercise burn is estimated from body weight. Without yours it
+              assumes 70 kg — fill in the calculator above for a closer figure.
+            </p>
+          )}
+
+          {profile.data.activityLevel &&
+            profile.data.activityLevel !== "sedentary" && (
+              <p className="flex gap-2 text-xs text-muted-foreground">
+                <Info className="mt-0.5 size-3.5 shrink-0" />
+                <span>
+                  Your activity level is set to{" "}
+                  <span className="font-medium">
+                    {profile.data.activityLevel.replace("_", " ")}
+                  </span>
+                  , which already assumes regular exercise. Logging workouts on
+                  top counts them twice — if you log most sessions here, set
+                  activity level to <span className="font-medium">sedentary</span>{" "}
+                  and let this do the work.
+                </span>
+              </p>
+            )}
         </CardContent>
       </Card>
 

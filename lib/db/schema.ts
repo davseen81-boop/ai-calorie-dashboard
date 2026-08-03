@@ -125,8 +125,60 @@ export const profiles = sqliteTable("profiles", {
   activityLevel: text("activity_level", { enum: ACTIVITY_LEVELS }),
   goalType: text("goal_type", { enum: GOAL_TYPES }),
 
+  /**
+   * Whether logged exercise raises the day's calorie target.
+   *
+   * Genuinely contested — "eating back" exercise calories helps some people
+   * fuel training and leads others to overshoot, since burn estimates run
+   * optimistic. Default on because that's what someone logging exercise
+   * usually expects; switchable because the other view is defensible.
+   */
+  adjustTargetForExercise: integer("adjust_target_for_exercise", {
+    mode: "boolean",
+  })
+    .notNull()
+    .default(true),
+
   ...timestamps,
 });
+
+/**
+ * A logged workout.
+ *
+ * `caloriesBurned` is stored rather than recomputed on read: it depends on
+ * body weight at the time, and a weight change months later shouldn't silently
+ * rewrite history.
+ */
+export const exerciseEntries = sqliteTable(
+  "exercise_entries",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().default(DEFAULT_USER_ID),
+
+    name: text("name").notNull(),
+    /** Key from the MET table, or null for a hand-entered activity. */
+    activityKey: text("activity_key"),
+    durationMinutes: integer("duration_minutes").notNull(),
+    caloriesBurned: real("calories_burned").notNull().default(0),
+
+    /** 'estimated' from METs, or 'manual' when the user typed the figure. */
+    source: text("source", { enum: ["estimated", "manual"] })
+      .notNull()
+      .default("estimated"),
+    notes: text("notes"),
+
+    performedAt: integer("performed_at", { mode: "timestamp_ms" }).notNull(),
+    ...timestamps,
+  },
+  (table) => ({
+    userPerformedIdx: index("exercise_user_performed_idx").on(
+      table.userId,
+      table.performedAt,
+    ),
+  }),
+);
+
+export type ExerciseEntryRow = typeof exerciseEntries.$inferSelect;
 
 /**
  * One logged meal. Macro totals are denormalised here and recomputed by

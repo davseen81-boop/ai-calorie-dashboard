@@ -5,6 +5,7 @@ import { format, parseISO } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { CalorieRing } from "@/components/dashboard/calorie-ring";
 import { MacroDonut } from "@/components/dashboard/macro-donut";
+import { ExerciseCard } from "@/components/dashboard/exercise-card";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { WeeklyChart } from "@/components/dashboard/weekly-chart";
 import { InstallPrompt } from "@/components/layout/install-prompt";
@@ -55,6 +56,8 @@ export default function DashboardPage() {
 
         <MacroDonut consumed={summary.consumed} goals={summary.goals} />
       </div>
+
+      <ExerciseCard summary={summary} />
 
       {/* The weekly chart loads independently so a slow week query never
           blocks today's numbers, which are the reason the page exists. */}

@@ -1,4 +1,5 @@
 import type {
+  ExerciseEntryRow,
   MealItemRow,
   MealRow,
   MealType,
@@ -44,6 +45,14 @@ export type ApiRoutine = Serialized<RoutineRow> & {
   schedule: Serialized<RoutineScheduleRow> | null;
 };
 
+export type ApiExerciseEntry = Serialized<ExerciseEntryRow>;
+
+export interface TargetAdvice {
+  tone: "under" | "on_track" | "close" | "over";
+  headline: string;
+  detail: string;
+}
+
 export interface MacroTotals {
   calories: number;
   proteinG: number;
@@ -66,6 +75,13 @@ export interface TodaySummary {
   remainingCalories: number;
   goalProgress: number;
   meals: ApiMeal[];
+  exercise: {
+    entries: ApiExerciseEntry[];
+    caloriesBurned: number;
+    adjustsTarget: boolean;
+    baseGoal: number;
+  };
+  advice: TargetAdvice;
 }
 
 export interface WeeklyDay {
