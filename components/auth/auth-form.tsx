@@ -3,9 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Flame, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  EnergyArcMark,
+  EnergyArcWordmark,
+} from "@/components/brand/energy-arc";
 import {
   Card,
   CardContent,
@@ -105,13 +109,16 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm space-y-6">
-        <div className="flex flex-col items-center gap-3 text-center">
-          <span className="gradient-primary flex size-12 items-center justify-center rounded-2xl shadow-sm">
-            <Flame className="size-6 text-white" />
-          </span>
-          <h1 className="gradient-text text-2xl font-semibold tracking-tight">
-            Calorie Dashboard
-          </h1>
+        {/* The only place the mark animates: it is the hero here, and the
+            screen is entered once rather than navigated back to. */}
+        <div className="flex flex-col items-center gap-4 text-center">
+          <EnergyArcMark className="size-24" animated />
+          <div className="space-y-1.5">
+            <EnergyArcWordmark className="block text-2xl" />
+            <p className="text-sm text-muted-foreground">
+              A minimalist approach to progress tracking.
+            </p>
+          </div>
         </div>
 
         <Card>
@@ -232,7 +239,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
 
               <Button
                 type="submit"
-                className="gradient-primary w-full text-white hover:opacity-90"
+                className="gradient-primary w-full hover:opacity-90"
                 disabled={pending}
               >
                 {pending ? (

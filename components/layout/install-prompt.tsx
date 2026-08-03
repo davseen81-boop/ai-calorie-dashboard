@@ -72,7 +72,8 @@ export function InstallPrompt() {
     <Card className="border-primary/30 bg-primary/5">
       <CardContent className="flex items-start gap-3 p-4">
         <span className="gradient-primary mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg">
-          <Download className="size-4 text-white" />
+          {/* Inherits the near-black label colour `.gradient-primary` sets. */}
+          <Download className="size-4" />
         </span>
 
         <div className="min-w-0 flex-1">

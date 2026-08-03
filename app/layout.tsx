@@ -11,16 +11,17 @@ const geistSans = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Calorie Dashboard",
-  description:
-    "Log meals by description or photo and track calories and macros.",
-  applicationName: "Calorie Dashboard",
+  title: "Energy Arc",
+  description: "A minimalist approach to progress tracking.",
+  applicationName: "Energy Arc",
   appleWebApp: {
     // Lets iOS run it fullscreen from the home screen, like Android does
     // from the manifest.
     capable: true,
-    title: "Calories",
-    statusBarStyle: "default",
+    title: "Energy Arc",
+    // The app is dark by default, so a light status bar would sit as a white
+    // band above a near-black page.
+    statusBarStyle: "black-translucent",
   },
   icons: {
     icon: "/icons/icon-192.png",
@@ -33,7 +34,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0f1e" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f0f10" },
   ],
   // Installed apps should feel native: no pinch-zoom on chrome, and content
   // extends into the notch area.

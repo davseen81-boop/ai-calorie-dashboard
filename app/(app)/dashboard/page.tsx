@@ -4,7 +4,7 @@ import { format, parseISO } from "date-fns";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { CalorieRing } from "@/components/dashboard/calorie-ring";
-import { MacroDonut } from "@/components/dashboard/macro-donut";
+import { MacroArcs } from "@/components/dashboard/macro-arcs";
 import { DayTypeSelector } from "@/components/dashboard/day-type-selector";
 import { ExerciseCard } from "@/components/dashboard/exercise-card";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
@@ -57,7 +57,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <MacroDonut consumed={summary.consumed} goals={summary.goals} />
+        <MacroArcs consumed={summary.consumed} goals={summary.goals} />
       </div>
 
       <ExerciseCard summary={summary} />

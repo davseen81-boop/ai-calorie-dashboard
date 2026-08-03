@@ -1,11 +1,17 @@
-# AI Calorie Dashboard
+# Energy Arc
 
-Log meals by description or photo, let Claude estimate the nutrition, and track
-calories and macros against daily goals.
+*A minimalist approach to progress tracking.*
 
-Single-user by design — there is no login. Every row carries a `userId`
-(defaulted to `local-user`) so authentication can be added later without
-reshaping the data.
+Log meals by description, photo or conversation; an AI estimates the nutrition,
+and the day is tracked against calorie and macro targets that move with rest and
+active days.
+
+Multi-user, with email/password and optional Google sign-in behind an invite
+code. Every row is scoped by `userId`.
+
+**Jarvis** is the built-in assistant: it logs meals and workouts by tool
+calling through the same data layer the UI uses, so nothing it writes is a
+special case.
 
 ## Stack
 

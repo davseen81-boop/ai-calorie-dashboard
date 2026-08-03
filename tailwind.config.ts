@@ -57,7 +57,15 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Macro nutrients — referenced by the donut chart and macro badges.
+        // The three arcs of the mark. Every brand-coloured surface refers to
+        // one of these, so retinting the app is three values.
+        arc: {
+          blue: "hsl(var(--arc-blue))",
+          orange: "hsl(var(--arc-orange))",
+          yellow: "hsl(var(--arc-yellow))",
+        },
+        // Macro nutrients — aliases of the arcs, so the macro rings and the
+        // logo are the same three colours in the same order.
         protein: "hsl(var(--protein))",
         carbs: "hsl(var(--carbs))",
         fat: "hsl(var(--fat))",
@@ -79,11 +87,24 @@ const config: Config = {
         shimmer: {
           "100%": { transform: "translateX(100%)" },
         },
+        // Draws an arc on from nothing. Each arc has its own length, so the
+        // start offset comes from a per-element `--arc-len` rather than being
+        // baked into the keyframe.
+        "arc-draw": {
+          from: { strokeDashoffset: "var(--arc-len)" },
+          to: { strokeDashoffset: "0" },
+        },
+        "dot-pulse": {
+          "0%, 100%": { opacity: "1", transform: "scale(1)" },
+          "50%": { opacity: "0.65", transform: "scale(0.86)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         shimmer: "shimmer 1.6s infinite",
+        "arc-draw": "arc-draw 1.1s cubic-bezier(0.22, 1, 0.36, 1) both",
+        "dot-pulse": "dot-pulse 2.4s ease-in-out infinite",
       },
     },
   },

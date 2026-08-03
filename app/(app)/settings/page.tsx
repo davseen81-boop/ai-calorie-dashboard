@@ -533,7 +533,7 @@ export default function SettingsPage() {
       {/* Sticky so the save action stays reachable on a long mobile page. */}
       <div className="sticky bottom-20 z-30 md:bottom-4">
         <Button
-          className="gradient-primary w-full text-white shadow-lg hover:opacity-90"
+          className="gradient-primary w-full shadow-lg hover:opacity-90"
           size="lg"
           disabled={!dirty || update.isPending}
           onClick={() =>

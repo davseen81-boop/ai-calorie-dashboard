@@ -3,105 +3,130 @@
 @tailwind utilities;
 
 /* ---------------------------------------------------------------------------
-   Design tokens.
+   Design tokens — Energy Arc.
 
    Values are raw HSL channels (no `hsl()` wrapper) so Tailwind can compose them
    with an alpha channel — `hsl(var(--primary) / 0.5)`. This is the shadcn/ui
    convention; changing the format here breaks every generated component.
 
-   Palette: violet/purple primary, per the purple-gradient theme.
+   The palette is the logo: three concentric arcs in blue, orange and yellow on
+   near-black. Those three hues are the whole system — blue carries state,
+   orange and yellow carry action and energy, and nothing else is introduced.
 --------------------------------------------------------------------------- */
 
 @layer base {
   :root {
+    /* ---- Brand arcs -------------------------------------------------------
+       Darker in light mode than in dark: the logo's tints are tuned for a
+       black background and drop to roughly 2:1 contrast on white. */
+    --arc-blue: 204 72% 42%;
+    --arc-orange: 23 85% 47%;
+    --arc-yellow: 40 88% 40%;
+
     --background: 0 0% 100%;
-    --foreground: 224 71.4% 4.1%;
+    --foreground: 240 10% 8%;
 
     --card: 0 0% 100%;
-    --card-foreground: 224 71.4% 4.1%;
+    --card-foreground: 240 10% 8%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 224 71.4% 4.1%;
+    --popover-foreground: 240 10% 8%;
 
-    --primary: 262.1 83.3% 57.8%;
-    --primary-foreground: 210 20% 98%;
+    --primary: 204 76% 40%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 14.3% 95.9%;
-    --secondary-foreground: 220.9 39.3% 11%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 10% 12%;
 
-    --muted: 220 14.3% 95.9%;
-    --muted-foreground: 220 8.9% 46.1%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 44%;
 
-    --accent: 220 14.3% 95.9%;
-    --accent-foreground: 220.9 39.3% 11%;
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 10% 12%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 20% 98%;
+    --destructive: 0 72% 48%;
+    --destructive-foreground: 0 0% 100%;
 
-    --success: 142.1 76.2% 36.3%;
-    --success-foreground: 355.7 100% 97.3%;
+    --success: 160 62% 34%;
+    --success-foreground: 0 0% 100%;
 
-    --warning: 32.1 94.6% 43.7%;
-    --warning-foreground: 355.7 100% 97.3%;
+    --warning: 33 90% 42%;
+    --warning-foreground: 0 0% 100%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 262.1 83.3% 57.8%;
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 204 76% 45%;
 
     --radius: 0.75rem;
 
-    /* Macro nutrients — fixed hues so the donut chart, legend and any macro
-       badge always agree on which colour means which macro. */
-    --protein: 262.1 83.3% 57.8%;
-    --carbs: 199 89% 48%;
-    --fat: 32.1 94.6% 43.7%;
+    /* Macros map onto the three arcs, outermost first, so the dashboard ring
+       and the logo are visibly the same object. */
+    --protein: var(--arc-blue);
+    --carbs: var(--arc-orange);
+    --fat: var(--arc-yellow);
 
-    /* Ends of the signature purple gradient. */
-    --gradient-from: 262.1 83.3% 57.8%;
-    --gradient-to: 291.5 80% 62%;
+    /* The action gradient: orange into yellow, the warm half of the mark.
+       Its foreground is near-black — white on yellow fails contrast at every
+       weight, and the button ends up unreadable exactly where it matters. */
+    --energy-from: 23 89% 52%;
+    --energy-to: 40 92% 52%;
+    --energy-foreground: 24 40% 8%;
+
+    /* The lit head of an arc. White is the logo's own choice and right on
+       near-black; on white it disappears, so it inverts with the theme. */
+    --spark: 240 10% 18%;
   }
 
   .dark {
-    --background: 224 71.4% 4.1%;
-    --foreground: 210 20% 98%;
+    --arc-blue: 204 76% 74%;
+    --arc-orange: 23 89% 56%;
+    --arc-yellow: 43 92% 66%;
 
-    --card: 224 46% 8%;
-    --card-foreground: 210 20% 98%;
+    --background: 240 5% 6%;
+    --foreground: 0 0% 98%;
 
-    --popover: 224 46% 8%;
-    --popover-foreground: 210 20% 98%;
+    /* Barely lighter than the page, then separated by a border rather than a
+       shadow — shadows are invisible on near-black. */
+    --card: 240 5% 10%;
+    --card-foreground: 0 0% 98%;
 
-    --primary: 263.4 70% 50.4%;
-    --primary-foreground: 210 20% 98%;
+    --popover: 240 5% 10%;
+    --popover-foreground: 0 0% 98%;
 
-    --secondary: 215 27.9% 16.9%;
-    --secondary-foreground: 210 20% 98%;
+    --primary: 204 76% 72%;
+    --primary-foreground: 240 8% 8%;
 
-    --muted: 215 27.9% 16.9%;
-    --muted-foreground: 217.9 10.6% 64.9%;
+    --secondary: 240 4% 15%;
+    --secondary-foreground: 0 0% 98%;
 
-    --accent: 215 27.9% 16.9%;
-    --accent-foreground: 210 20% 98%;
+    --muted: 240 4% 15%;
+    --muted-foreground: 240 5% 62%;
 
-    --destructive: 0 62.8% 50%;
-    --destructive-foreground: 210 20% 98%;
+    --accent: 240 4% 15%;
+    --accent-foreground: 0 0% 98%;
 
-    --success: 142.1 70.6% 45.3%;
-    --success-foreground: 144.9 80.4% 10%;
+    --destructive: 0 72% 58%;
+    --destructive-foreground: 0 0% 98%;
 
-    --warning: 32.1 94.6% 43.7%;
-    --warning-foreground: 20.9 91.7% 14.1%;
+    --success: 160 60% 48%;
+    --success-foreground: 160 80% 8%;
 
-    --border: 215 27.9% 16.9%;
-    --input: 215 27.9% 16.9%;
-    --ring: 263.4 70% 50.4%;
+    --warning: 40 92% 60%;
+    --warning-foreground: 40 90% 10%;
 
-    --protein: 263.4 70% 60%;
-    --carbs: 199 89% 55%;
-    --fat: 32.1 94.6% 55%;
+    --border: 240 4% 18%;
+    --input: 240 4% 18%;
+    --ring: 204 76% 72%;
 
-    --gradient-from: 263.4 70% 50.4%;
-    --gradient-to: 291.5 70% 55%;
+    --protein: var(--arc-blue);
+    --carbs: var(--arc-orange);
+    --fat: var(--arc-yellow);
+
+    --energy-from: 23 89% 56%;
+    --energy-to: 43 92% 66%;
+    --energy-foreground: 24 40% 8%;
+
+    --spark: 0 0% 100%;
   }
 }
 
@@ -114,27 +139,84 @@
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+
+  /**
+   * The lit backdrop from the logo art: a soft pool of light behind the
+   * content, with fine grain over it so the large dark areas don't band on
+   * cheap panels. Fixed and behind everything, so it never scrolls or
+   * intercepts a click.
+   */
+  .dark body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      radial-gradient(
+        ellipse 70% 55% at 50% 32%,
+        hsl(240 5% 16% / 0.9),
+        transparent 72%
+      ),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  }
 }
 
 @layer components {
-  /* The signature purple gradient, reused by the app shell, primary CTAs and
-     the daily-goal progress ring. */
+  /**
+   * The action treatment: warm gradient, near-black label.
+   *
+   * The foreground is set here rather than at each call site so a new button
+   * cannot get it wrong — an inherited `text-white` on this background is the
+   * single easiest way to ship something unreadable.
+   */
   .gradient-primary {
     background-image: linear-gradient(
       135deg,
-      hsl(var(--gradient-from)),
-      hsl(var(--gradient-to))
+      hsl(var(--energy-from)),
+      hsl(var(--energy-to))
     );
+    color: hsl(var(--energy-foreground));
   }
 
   .gradient-text {
     background-image: linear-gradient(
       135deg,
-      hsl(var(--gradient-from)),
-      hsl(var(--gradient-to))
+      hsl(var(--energy-from)),
+      hsl(var(--energy-to))
     );
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+  }
+
+  /** The wordmark's wide tracking. The right padding compensates for the
+      trailing letter-space, which otherwise reads as a lopsided margin. */
+  .wordmark {
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    padding-right: 0.22em;
+  }
+}
+
+@layer utilities {
+  /** Bloom around a stroke, matching the lit look of the mark. Only in dark —
+      on white it turns into a muddy halo. */
+  .arc-glow {
+    filter: none;
+  }
+
+  .dark .arc-glow {
+    filter: drop-shadow(0 0 4px hsl(var(--glow-color, 0 0% 100%) / 0.55));
+  }
+
+  /** The bloom on an arc's lit head. Same reasoning: a white halo on a white
+      page is either invisible or dirty, so it only exists in dark. */
+  .spark-glow {
+    filter: none;
+  }
+
+  .dark .spark-glow {
+    filter: drop-shadow(0 0 5px hsl(var(--spark) / 0.9));
   }
 }

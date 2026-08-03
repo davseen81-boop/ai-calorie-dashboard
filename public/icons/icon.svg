@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!--
+    Source of truth for every generated app icon. Kept in step with
+    components/brand/energy-arc.tsx by hand: same radii, sweeps and start
+    angles, scaled 5.12x from the 100-unit viewBox, with the colours resolved
+    to the dark theme's values since an icon has no theme to follow.
+
+    Padded to roughly 78% of the canvas so Android's maskable crop cannot
+    clip the outer arc.
+  -->
+  <defs>
+    <!-- Tight radius on purpose. A wide bloom spreads a unique value across
+         most of the canvas, and the exported PNG stops compressing — this
+         icon went from 260KB to a few KB by keeping the flat areas flat. -->
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" fill="#0f0f10"/>
+
+  <g transform="translate(256 256) scale(4) translate(-50 -50)" fill="none"
+     stroke-width="4.5" stroke-linecap="round" filter="url(#glow)">
+    <!-- outer: blue, from 12 o'clock, 80% sweep -->
+    <circle cx="50" cy="50" r="40" stroke="#9BD0F5"
+            stroke-dasharray="201.06 251.33" transform="rotate(-90 50 50)"/>
+    <!-- middle: orange, starting 35deg later, 76% sweep -->
+    <circle cx="50" cy="50" r="30" stroke="#F2762E"
+            stroke-dasharray="143.26 188.50" transform="rotate(-55 50 50)"/>
+    <!-- inner: yellow, starting 62deg later, 70% sweep -->
+    <circle cx="50" cy="50" r="20" stroke="#F8CE58"
+            stroke-dasharray="87.96 125.66" transform="rotate(-28 50 50)"/>
+    <!-- the lit head of the outer arc -->
+    <circle cx="50" cy="10" r="2.8" fill="#fff" stroke="none"/>
+  </g>
+</svg>

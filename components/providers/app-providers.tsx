@@ -32,9 +32,12 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
+      {/* Dark by default rather than following the system: the brand is a lit
+          mark on near-black, and that is the design the app is drawn for.
+          Light remains a properly-tuned option behind the toggle. */}
       <ThemeProvider
         attribute="class"
-        defaultTheme="system"
+        defaultTheme="dark"
         enableSystem
         disableTransitionOnChange
       >

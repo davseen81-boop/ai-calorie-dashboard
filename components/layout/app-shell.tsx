@@ -2,15 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Flame,
-  History,
-  LayoutDashboard,
-  Repeat2,
-  Settings,
-} from "lucide-react";
+import { History, LayoutDashboard, Repeat2, Settings } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { EnergyArcLogo } from "@/components/brand/energy-arc";
 import { LogMealSheet } from "@/components/meals/log-meal-sheet";
 import { JarvisButton } from "@/components/jarvis/jarvis-button";
 import { JarvisProvider } from "@/components/jarvis/jarvis-provider";
@@ -38,13 +33,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-dvh flex-col bg-background">
         <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container flex h-16 items-center gap-4">
-            <Link href="/dashboard" className="flex items-center gap-2">
-              <span className="gradient-primary flex size-9 items-center justify-center rounded-xl shadow-sm">
-                <Flame className="size-5 text-white" />
-              </span>
-              <span className="gradient-text text-lg font-semibold tracking-tight">
-                Calorie&nbsp;Dashboard
-              </span>
+            <Link href="/dashboard" aria-label="Energy Arc — dashboard">
+              <EnergyArcLogo />
             </Link>
 
             <nav className="ml-6 hidden items-center gap-1 md:flex">

@@ -55,8 +55,10 @@ export function JarvisPanel() {
               a screen reader announces as "JarvisClear". */}
           <div className="flex items-center gap-2">
             <SheetTitle className="flex items-center gap-2">
-              <span className="gradient-primary flex size-7 items-center justify-center rounded-lg">
-                <Bot className="size-4 text-white" />
+              {/* Jarvis gets the blue arc rather than the action gradient —
+                  it's a presence in the app, not a call to action. */}
+              <span className="flex size-7 items-center justify-center rounded-lg border border-arc-blue/30 bg-arc-blue/10 text-arc-blue">
+                <Bot className="size-4" />
               </span>
               Jarvis
             </SheetTitle>
@@ -134,7 +136,7 @@ export function JarvisPanel() {
             />
             <Button
               size="icon"
-              className="gradient-primary shrink-0 text-white hover:opacity-90"
+              className="gradient-primary shrink-0 hover:opacity-90"
               onClick={submit}
               disabled={!draft.trim() || pending}
               aria-label="Send"
@@ -161,7 +163,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         className={cn(
           "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm",
           isUser
-            ? "gradient-primary rounded-br-sm text-white"
+            ? "gradient-primary rounded-br-sm"
             : "rounded-bl-sm bg-secondary text-foreground",
           message.failed && "bg-destructive/10 text-destructive",
         )}

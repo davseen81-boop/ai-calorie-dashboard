@@ -51,13 +51,13 @@ export function LogMealSheet({ floating = false }: { floating?: boolean }) {
         {floating ? (
           <Button
             size="icon"
-            className="gradient-primary size-14 rounded-full text-white shadow-lg hover:opacity-90"
+            className="gradient-primary size-14 rounded-full shadow-lg hover:opacity-90"
             aria-label="Log a meal"
           >
             <Plus className="size-6" />
           </Button>
         ) : (
-          <Button className="gradient-primary text-white hover:opacity-90">
+          <Button className="gradient-primary hover:opacity-90">
             <Plus className="mr-2 size-4" />
             Log meal
           </Button>
@@ -249,7 +249,7 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
               />
 
               <Button
-                className="gradient-primary w-full text-white hover:opacity-90"
+                className="gradient-primary w-full hover:opacity-90"
                 disabled={description.trim().length < 2 || analyze.isPending}
                 onClick={handleAnalyzeText}
               >
@@ -358,7 +358,7 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
               />
 
               <Button
-                className="gradient-primary w-full text-white hover:opacity-90"
+                className="gradient-primary w-full hover:opacity-90"
                 disabled={!image || analyze.isPending}
                 onClick={handleAnalyzePhoto}
               >
@@ -463,7 +463,7 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
             Back
           </Button>
           <Button
-            className="gradient-primary flex-1 text-white hover:opacity-90"
+            className="gradient-primary flex-1 hover:opacity-90"
             onClick={handleSave}
             disabled={!canSave || save.isPending}
           >

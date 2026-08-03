@@ -12,18 +12,27 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Calorie Dashboard",
-    // Home screens truncate at roughly 12 characters.
-    short_name: "Calories",
-    description:
-      "Log meals by description or photo and track calories and macros.",
+    name: "Energy Arc",
+    // Home screens truncate at roughly 12 characters — this fits at 10.
+    short_name: "Energy Arc",
+    description: "A minimalist approach to progress tracking.",
     start_url: "/dashboard",
     display: "standalone",
     orientation: "portrait",
-    background_color: "#ffffff",
-    theme_color: "#7c3aed",
+    // Both near-black: the splash screen and the status bar should be the
+    // page the app actually opens on, not a white flash before it.
+    background_color: "#0f0f10",
+    theme_color: "#0f0f10",
     categories: ["health", "fitness", "lifestyle"],
     icons: [
+      {
+        // Listed first so anything that can use vector does. The PNGs below
+        // remain because iOS ignores SVG icons entirely.
+        src: "/icons/icon.svg",
+        sizes: "any",
+        type: "image/svg+xml",
+        purpose: "any",
+      },
       {
         src: "/icons/icon-192.png",
         sizes: "192x192",
