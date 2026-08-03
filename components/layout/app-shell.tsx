@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { History, LayoutDashboard, Repeat2, Settings } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { BRAND_NAME } from "@/lib/brand";
 import { EnergyArcLogo } from "@/components/brand/energy-arc";
 import { LogMealSheet } from "@/components/meals/log-meal-sheet";
 import { JarvisButton } from "@/components/jarvis/jarvis-button";
@@ -33,7 +34,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-dvh flex-col bg-background">
         <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container flex h-16 items-center gap-4">
-            <Link href="/dashboard" aria-label="Energy Arc — dashboard">
+            <Link href="/dashboard" aria-label={`${BRAND_NAME} — dashboard`}>
               <EnergyArcLogo />
             </Link>
 

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 
 import { AppProviders } from "@/components/providers/app-providers";
+import { BRAND_NAME, BRAND_TAGLINE, BRAND_TITLE } from "@/lib/brand";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -11,14 +12,19 @@ const geistSans = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Energy Arc",
-  description: "A minimalist approach to progress tracking.",
-  applicationName: "Energy Arc",
+  title: {
+    default: BRAND_TITLE,
+    // Sub-pages set just their own name — "Sign in" becomes
+    // "Sign in · Energy ARC" without repeating the brand at every call site.
+    template: `%s · ${BRAND_NAME}`,
+  },
+  description: BRAND_TAGLINE,
+  applicationName: BRAND_NAME,
   appleWebApp: {
     // Lets iOS run it fullscreen from the home screen, like Android does
     // from the manifest.
     capable: true,
-    title: "Energy Arc",
+    title: BRAND_NAME,
     // The app is dark by default, so a light status bar would sit as a white
     // band above a near-black page.
     statusBarStyle: "black-translucent",

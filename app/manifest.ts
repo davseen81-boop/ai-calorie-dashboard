@@ -1,5 +1,11 @@
 import type { MetadataRoute } from "next";
 
+import {
+  BRAND_SHORT_NAME,
+  BRAND_TAGLINE,
+  BRAND_TITLE,
+} from "@/lib/brand";
+
 /**
  * Web app manifest.
  *
@@ -12,10 +18,12 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Energy Arc",
-    // Home screens truncate at roughly 12 characters — this fits at 10.
-    short_name: "Energy Arc",
-    description: "A minimalist approach to progress tracking.",
+    // The install prompt and splash screen show `name`; the label under the
+    // icon shows `short_name`, which launchers truncate at roughly 12
+    // characters — hence the name alone there.
+    name: BRAND_TITLE,
+    short_name: BRAND_SHORT_NAME,
+    description: BRAND_TAGLINE,
     start_url: "/dashboard",
     display: "standalone",
     orientation: "portrait",

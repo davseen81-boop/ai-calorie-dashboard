@@ -1,7 +1,8 @@
+import { BRAND_NAME } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
 /**
- * The Energy Arc mark.
+ * The Energy ARC mark.
  *
  * Rebuilt as vector rather than shipping the artwork as a bitmap: it has to
  * work at 20px in a header and 512px as an app icon, retint between themes,
@@ -47,7 +48,7 @@ export function EnergyArcMark({
       viewBox="0 0 100 100"
       className={cn("shrink-0", className)}
       role="img"
-      aria-label="Energy Arc"
+      aria-label={BRAND_NAME}
     >
       {ARCS.map((arc, index) => {
         const circumference = 2 * Math.PI * arc.r;
@@ -97,7 +98,7 @@ export function EnergyArcMark({
 /** The wordmark, in the logo's wide tracking. */
 export function EnergyArcWordmark({ className }: { className?: string }) {
   return (
-    <span className={cn("wordmark font-medium", className)}>Energy Arc</span>
+    <span className={cn("wordmark font-medium", className)}>{BRAND_NAME}</span>
   );
 }
 

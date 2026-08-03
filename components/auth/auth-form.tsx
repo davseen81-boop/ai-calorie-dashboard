@@ -10,6 +10,7 @@ import {
   EnergyArcMark,
   EnergyArcWordmark,
 } from "@/components/brand/energy-arc";
+import { BRAND_TAGLINE } from "@/lib/brand";
 import {
   Card,
   CardContent,
@@ -116,7 +117,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           <div className="space-y-1.5">
             <EnergyArcWordmark className="block text-2xl" />
             <p className="text-sm text-muted-foreground">
-              A minimalist approach to progress tracking.
+              {BRAND_TAGLINE}
             </p>
           </div>
         </div>

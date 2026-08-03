@@ -1,6 +1,6 @@
-# Energy Arc
+# Energy ARC
 
-*A minimalist approach to progress tracking.*
+*Your smart AI Calorie calculator.*
 
 Log meals by description, photo or conversation; an AI estimates the nutrition,
 and the day is tracked against calorie and macro targets that move with rest and

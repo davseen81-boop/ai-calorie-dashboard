@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* ---------------------------------------------------------------------------
-   Design tokens — Energy Arc.
+   Design tokens — Energy ARC.
 
    Values are raw HSL channels (no `hsl()` wrapper) so Tailwind can compose them
    with an alpha channel — `hsl(var(--primary) / 0.5)`. This is the shadcn/ui
