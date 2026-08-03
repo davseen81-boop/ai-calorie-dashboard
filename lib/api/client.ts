@@ -11,7 +11,7 @@ import type { ApiError } from "./response";
 export class ApiRequestError extends Error {
   constructor(
     message: string,
-    readonly code: ApiError["code"] | "network_error",
+    readonly code: ApiError["code"] | "network_error" | "timeout",
     readonly status: number,
     readonly details?: unknown,
   ) {
@@ -20,18 +20,47 @@ export class ApiRequestError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+/**
+ * Default request timeout.
+ *
+ * Without one, a hung upstream leaves the UI spinning indefinitely with no way
+ * out. Vision calls are the slow case, so this is generous rather than tight —
+ * see `timeoutMs` for per-call overrides.
+ */
+const DEFAULT_TIMEOUT_MS = 90_000;
+
+interface RequestOptions extends RequestInit {
+  timeoutMs?: number;
+}
+
+async function request<T>(path: string, init?: RequestOptions): Promise<T> {
   let response: Response;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    init?.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+  );
 
   try {
     response = await fetch(path, {
       ...init,
+      signal: controller.signal,
       headers: {
         ...(init?.body ? { "content-type": "application/json" } : {}),
         ...init?.headers,
       },
     });
   } catch (error) {
+    // An abort is our own timeout firing, not a connectivity problem — saying
+    // "check your connection" there would send the user down a dead end.
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new ApiRequestError(
+        "That took too long and was cancelled. Try again, or enter the meal manually.",
+        "timeout",
+        0,
+      );
+    }
     // Offline, DNS failure, or the dev server restarting mid-request.
     throw new ApiRequestError(
       "Could not reach the server. Check your connection.",
@@ -39,14 +68,24 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       0,
       error instanceof Error ? error.message : String(error),
     );
+  } finally {
+    clearTimeout(timeout);
   }
 
   let payload: unknown;
   try {
     payload = await response.json();
   } catch {
-    // A non-JSON body means something upstream failed (proxy, crash) — the
-    // status code is the only signal available.
+    // A non-JSON body means the request never reached the app — a platform
+    // error page, a proxy, or a crash. 413 is the one worth naming: the
+    // hosting platform rejects oversized bodies itself, with plain text.
+    if (response.status === 413) {
+      throw new ApiRequestError(
+        "That upload was too large to send. Try a smaller photo.",
+        "payload_too_large",
+        413,
+      );
+    }
     throw new ApiRequestError(
       `Unexpected response from the server (${response.status}).`,
       "internal_error",
@@ -69,8 +108,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, body: unknown) =>
-    request<T>(path, { method: "POST", body: JSON.stringify(body) }),
+  post: <T>(path: string, body: unknown, options?: { timeoutMs?: number }) =>
+    request<T>(path, {
+      method: "POST",
+      body: JSON.stringify(body),
+      ...options,
+    }),
   patch: <T>(path: string, body: unknown) =>
     request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),

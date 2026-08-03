@@ -4,14 +4,21 @@ import { MEAL_TYPES, MEAL_SOURCES } from "@/lib/db/schema";
 
 /** Request-body schemas for the meal routes. */
 
-/** Base64 payloads inflate by ~33%, so this caps the original at roughly 7MB. */
-const MAX_IMAGE_DATA_URL_CHARS = 10_000_000;
+/**
+ * Deliberately below the hosting platform's request-body limit (4.5MB on
+ * Vercel). Anything larger is rejected by the platform *before* this code
+ * runs, producing an opaque 413 the client can't explain — so the cap here
+ * has to leave headroom rather than match it.
+ *
+ * The client compresses to well under this; the limit is a backstop.
+ */
+const MAX_IMAGE_DATA_URL_CHARS = 3_500_000;
 
 const dataUrlSchema = z
   .string()
   .max(
     MAX_IMAGE_DATA_URL_CHARS,
-    "Image is too large. Please use one under about 7MB.",
+    "That image is too large even after compression. Try a smaller photo.",
   )
   .regex(
     /^data:image\/(jpeg|jpg|png|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/,

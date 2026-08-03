@@ -29,11 +29,13 @@ import { cn } from "@/lib/utils";
 import { MEAL_TYPES } from "@/lib/db/schema";
 import { useAnalyzeMeal, useSaveMeal } from "@/hooks/use-meals";
 import type { AnalyzedItem, AnalyzeResponse, MealType } from "@/types/api";
+import {
+  ImageProcessingError,
+  formatBytes,
+  prepareImageForUpload,
+} from "@/lib/images";
 import { AnalyzedItemsEditor } from "./analyzed-items-editor";
 import { RepeatPicker } from "./repeat-picker";
-
-/** Matches the server-side cap in lib/validation/meals.ts (~7MB of image). */
-const MAX_IMAGE_BYTES = 7_000_000;
 
 export function LogMealSheet({ floating = false }: { floating?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -81,6 +83,8 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
   const [description, setDescription] = useState("");
   const [caption, setCaption] = useState("");
   const [image, setImage] = useState<string | null>(null);
+  const [imageInfo, setImageInfo] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
   const [mealTypeHint, setMealTypeHint] = useState<MealType | "auto">("auto");
 
   const [analysis, setAnalysis] = useState<AnalyzeResponse | null>(null);
@@ -126,18 +130,25 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
     );
   }
 
-  function handleFile(file: File) {
-    if (file.size > MAX_IMAGE_BYTES) {
-      toast.error("That image is too large. Please pick one under 7MB.");
-      return;
+  async function handleFile(file: File) {
+    setPreparing(true);
+    try {
+      // Compressed in the browser: the raw file is far too big to POST, and
+      // this also re-encodes HEIC and fixes EXIF rotation.
+      const prepared = await prepareImageForUpload(file);
+      setImage(prepared.dataUrl);
+      setImageInfo(
+        `${formatBytes(prepared.originalBytes)} → ${formatBytes(prepared.encodedBytes)}`,
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof ImageProcessingError
+          ? error.message
+          : "Could not read that image.",
+      );
+    } finally {
+      setPreparing(false);
     }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") setImage(reader.result);
-    };
-    reader.onerror = () => toast.error("Could not read that image.");
-    reader.readAsDataURL(file);
   }
 
   /** Skip analysis entirely and go straight to the editor with a blank row. */
@@ -260,11 +271,15 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
               <input
                 ref={fileInput}
                 type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
+                // Any image type: an iPhone may hand over HEIC, which the
+                // browser can decode and we re-encode to JPEG. Listing only
+                // JPEG/PNG would grey those photos out in the picker.
+                accept="image/*"
+                capture="environment"
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) handleFile(file);
+                  if (file) void handleFile(file);
                   // Reset so picking the same file twice still fires onChange.
                   e.target.value = "";
                 }}
@@ -284,21 +299,43 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
                     size="icon"
                     variant="secondary"
                     className="absolute right-2 top-2 size-8 rounded-full"
-                    onClick={() => setImage(null)}
+                    onClick={() => {
+                      setImage(null);
+                      setImageInfo(null);
+                    }}
                     aria-label="Remove photo"
                   >
                     <X className="size-4" />
                   </Button>
+                  {imageInfo && (
+                    <span className="absolute bottom-2 left-2 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white">
+                      compressed {imageInfo}
+                    </span>
+                  )}
                 </div>
               ) : (
                 <button
                   type="button"
+                  disabled={preparing}
                   onClick={() => fileInput.current?.click()}
-                  className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed py-12 text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                  className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed py-12 text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-60"
                 >
-                  <Camera className="size-8" />
-                  <span className="text-sm font-medium">Take or choose a photo</span>
-                  <span className="text-xs">JPEG, PNG, WebP or GIF · up to 7MB</span>
+                  {preparing ? (
+                    <>
+                      <Loader2 className="size-8 animate-spin" />
+                      <span className="text-sm font-medium">Preparing photo…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="size-8" />
+                      <span className="text-sm font-medium">
+                        Take or choose a photo
+                      </span>
+                      <span className="text-xs">
+                        Any size — it&apos;s resized on your device before upload
+                      </span>
+                    </>
+                  )}
                 </button>
               )}
 
