@@ -7,6 +7,7 @@ import { CalorieRing } from "@/components/dashboard/calorie-ring";
 import { MacroDonut } from "@/components/dashboard/macro-donut";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { WeeklyChart } from "@/components/dashboard/weekly-chart";
+import { InstallPrompt } from "@/components/layout/install-prompt";
 import { MealTimeline } from "@/components/meals/meal-timeline";
 import { DashboardSkeleton, QueryError } from "@/components/ui/query-states";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,6 +32,9 @@ export default function DashboardPage() {
           {format(parseISO(summary.date), "EEEE d MMMM")}
         </p>
       </header>
+
+      {/* Renders nothing once installed or dismissed. */}
+      <InstallPrompt />
 
       <SummaryCards
         consumed={summary.consumed}

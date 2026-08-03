@@ -10,13 +10,37 @@ import { SignJWT, jwtVerify } from "jose";
 
 export const SESSION_COOKIE = "calorie_session";
 
-/** Long enough that a personal tracker isn't constantly logging you out. */
-const SESSION_DAYS = 30;
+/**
+ * A year, and renewed on use (see `shouldRefresh`), so an account in regular
+ * use is never signed out. A personal food diary you have to log back into is
+ * a diary you stop keeping.
+ *
+ * It is not infinite on purpose: an abandoned session on a borrowed device
+ * should eventually lapse.
+ */
+const SESSION_DAYS = 365;
 export const SESSION_MAX_AGE = SESSION_DAYS * 24 * 60 * 60;
+
+/**
+ * How stale a token may get before it's reissued.
+ *
+ * Sliding expiry: each visit after this window pushes the expiry back another
+ * year. Renewing on *every* request would rewrite the cookie constantly for no
+ * benefit.
+ */
+const REFRESH_AFTER_SECONDS = 24 * 60 * 60;
 
 export interface SessionClaims {
   userId: string;
   email: string;
+  /** Issued-at, seconds since epoch. Absent on tokens minted before this. */
+  issuedAt?: number;
+}
+
+/** True when the session is worth reissuing to extend its life. */
+export function shouldRefresh(claims: SessionClaims): boolean {
+  if (!claims.issuedAt) return true;
+  return Date.now() / 1000 - claims.issuedAt > REFRESH_AFTER_SECONDS;
 }
 
 function getSecret(): Uint8Array {
@@ -58,6 +82,7 @@ export async function verifySessionToken(
     return {
       userId: payload.sub,
       email: typeof payload.email === "string" ? payload.email : "",
+      issuedAt: typeof payload.iat === "number" ? payload.iat : undefined,
     };
   } catch {
     return null;

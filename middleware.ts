@@ -1,6 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth/token";
+import {
+  SESSION_COOKIE,
+  SESSION_MAX_AGE,
+  createSessionToken,
+  shouldRefresh,
+  verifySessionToken,
+  type SessionClaims,
+} from "@/lib/auth/token";
 
 /**
  * Route protection.
@@ -57,10 +64,44 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     url.search = "";
-    return NextResponse.redirect(url);
+    return withRenewedSession(NextResponse.redirect(url), session);
   }
 
-  return NextResponse.next();
+  return withRenewedSession(NextResponse.next(), session);
+}
+
+/**
+ * Sliding expiry: push the session's life back on use.
+ *
+ * Without this a session would lapse a fixed year after sign-in no matter how
+ * often it was used. Renewing here means anyone using the app regularly is
+ * never signed out — which is the point of a daily food diary.
+ */
+async function withRenewedSession(
+  response: NextResponse,
+  session: SessionClaims,
+): Promise<NextResponse> {
+  if (!shouldRefresh(session)) return response;
+
+  try {
+    const token = await createSessionToken({
+      userId: session.userId,
+      email: session.email,
+    });
+
+    response.cookies.set(SESSION_COOKIE, token, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: SESSION_MAX_AGE,
+    });
+  } catch {
+    // A failed renewal must never block the request — the existing cookie is
+    // still valid, and the next request will try again.
+  }
+
+  return response;
 }
 
 export const config = {
