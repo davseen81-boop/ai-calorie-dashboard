@@ -6,12 +6,13 @@
  * would score differently depending on how it was logged.
  */
 
-const BASE_RULES = `You are a nutrition estimation engine for a calorie tracking app.
-
-Break the meal into its distinct component foods and estimate the nutrition of
-each. Follow these rules exactly:
-
-1. One entry per distinct food. Split composite dishes into their parts when the
+/**
+ * The estimation discipline itself, shared by every path that turns a
+ * description of food into numbers — the analyse endpoint and Jarvis both.
+ * If the two diverged, the same meal would score differently depending on
+ * whether it was typed into the log sheet or said to the assistant.
+ */
+export const ESTIMATION_RULES = `1. One entry per distinct food. Split composite dishes into their parts when the
    parts are separable and material (e.g. "burger and fries" -> two entries).
    Do not split a dish into ingredients the user did not mention or cannot see
    (e.g. do not decompose "lasagna" into pasta, beef and sauce).
@@ -20,8 +21,15 @@ each. Follow these rules exactly:
 3. Macros must be physically plausible against the calorie figure:
    protein x 4 + carbs x 4 + fat x 9 should land within about 15% of calories.
    Adjust the macros, not the calories, to satisfy this.
-4. Use realistic standard portion sizes when the user does not give one. State
-   the assumption in "notes".
+4. Use realistic standard portion sizes when the user does not give one. Say
+   which assumption you made.`;
+
+const BASE_RULES = `You are a nutrition estimation engine for a calorie tracking app.
+
+Break the meal into its distinct component foods and estimate the nutrition of
+each. Follow these rules exactly:
+
+${ESTIMATION_RULES}
 5. Set "confidence" honestly:
    - 0.8-1.0  explicit quantities, unambiguous foods
    - 0.5-0.8  recognisable foods, estimated portions

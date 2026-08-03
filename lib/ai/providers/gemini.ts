@@ -87,24 +87,50 @@ export const callGemini: ProviderCall = async ({ system, text, image }) => {
 
     return response.text ?? null;
   } catch (error) {
-    if (error instanceof AiAnalysisError) throw error;
+    throw mapGeminiError(error, model);
+  }
+};
 
-    const message = error instanceof Error ? error.message : String(error);
+/**
+ * Turns whatever the SDK threw into a typed error the routes can map to a
+ * status. Shared with the Jarvis chat provider so both surfaces explain a dead
+ * key, an exhausted quota and a retired model the same way.
+ */
+export function mapGeminiError(error: unknown, model: string): AiAnalysisError {
+  if (error instanceof AiAnalysisError) return error;
 
-    // Free-tier keys hit quota routinely, so it gets its own wording.
-    const rateLimited = /quota|rate limit|RESOURCE_EXHAUSTED|429/i.test(message);
-    // Google retires models for new accounts while still listing them for
-    // existing ones — without this, that reads as an unexplained outage.
-    const badModel = /not found|no longer available|NOT_FOUND|404/i.test(message);
+  const message = error instanceof Error ? error.message : String(error);
 
-    throw new AiAnalysisError(
-      rateLimited
+  // Free-tier keys hit quota routinely, so it gets its own wording.
+  const rateLimited = /quota|rate limit|RESOURCE_EXHAUSTED|429/i.test(message);
+  /**
+   * Per-day and per-minute exhaustion arrive as the same 429 but need opposite
+   * advice: "wait a minute" is actively misleading when the allowance is gone
+   * until midnight Pacific. Google names the quota it enforced, so use it.
+   */
+  const dailyQuota = rateLimited && /PerDay/i.test(message);
+  // Google retires models for new accounts while still listing them for
+  // existing ones — without this, that reads as an unexplained outage.
+  const badModel = /not found|no longer available|NOT_FOUND|404/i.test(message);
+  // Popular models shed load with a 503 rather than a queue. Nothing is wrong
+  // with the request, so this is the one case worth retrying.
+  const overloaded =
+    !rateLimited && /UNAVAILABLE|high demand|overloaded|503/i.test(message);
+
+  return new AiAnalysisError(
+    dailyQuota
+      ? `Today's free Gemini allowance for "${model}" is used up. It resets at ` +
+        `midnight Pacific time — or switch GEMINI_MODEL to a model with a larger ` +
+        `free tier, or enable billing on the key.`
+      : rateLimited
         ? "Gemini's rate limit was hit. Wait a minute and try again."
         : badModel
           ? `Gemini rejected the model "${model}". Set GEMINI_MODEL to one your account can use.`
-          : "Could not reach Gemini.",
-      "upstream_error",
-      message,
-    );
-  }
-};
+          : overloaded
+            ? "Gemini is busy right now. Give it a moment and try again."
+            : "Could not reach Gemini.",
+    "upstream_error",
+    message,
+    overloaded,
+  );
+}

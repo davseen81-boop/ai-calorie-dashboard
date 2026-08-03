@@ -81,6 +81,10 @@ export function handleRouteError(error: unknown): NextResponse {
       case "empty_result":
         return fail("ai_invalid_response", error.message, 502, error.details);
       case "upstream_error":
+        // The user gets a short message; the operator needs the provider's
+        // actual response, which is the only thing that distinguishes a quota
+        // from an outage from a malformed request.
+        console.error("AI upstream error:", error.message, error.details);
         return fail("ai_upstream_error", error.message, 503);
     }
   }

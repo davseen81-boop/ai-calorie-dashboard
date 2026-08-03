@@ -133,4 +133,17 @@ export interface AnalyzeResponse {
   items: AnalyzedItem[];
 }
 
+/** One side effect Jarvis carried out, shown under its reply. */
+export interface JarvisAction {
+  tool: string;
+  summary: string;
+  /** Whether cached dashboard data is now stale. */
+  mutating: boolean;
+}
+
+export interface JarvisReply {
+  reply: string;
+  actions: JarvisAction[];
+}
+
 export type { MealType, DayType };
