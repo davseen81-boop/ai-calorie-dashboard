@@ -5,6 +5,7 @@ import { format, parseISO } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { CalorieRing } from "@/components/dashboard/calorie-ring";
 import { MacroDonut } from "@/components/dashboard/macro-donut";
+import { DayTypeSelector } from "@/components/dashboard/day-type-selector";
 import { ExerciseCard } from "@/components/dashboard/exercise-card";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { WeeklyChart } from "@/components/dashboard/weekly-chart";
@@ -36,6 +37,8 @@ export default function DashboardPage() {
 
       {/* Renders nothing once installed or dismissed. */}
       <InstallPrompt />
+
+      <DayTypeSelector summary={summary} />
 
       <SummaryCards
         consumed={summary.consumed}

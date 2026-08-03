@@ -17,9 +17,15 @@ export const updateProfileSchema = z
   .object({
     displayName: z.string().trim().max(80).nullish(),
     dailyCalorieGoal: z.number().int().min(500).max(10000).optional(),
-    proteinGoalG: z.number().int().min(0).max(500).optional(),
-    carbsGoalG: z.number().int().min(0).max(1000).optional(),
-    fatGoalG: z.number().int().min(0).max(400).optional(),
+
+    // Null clears an override and returns the day to following the normal
+    // goal, so nullish rather than optional.
+    restDayCalories: z.number().int().min(500).max(10000).nullish(),
+    activeDayCalories: z.number().int().min(500).max(10000).nullish(),
+
+    proteinPct: z.number().int().min(0).max(100).optional(),
+    carbsPct: z.number().int().min(0).max(100).optional(),
+    fatPct: z.number().int().min(0).max(100).optional(),
     dietaryPreferences: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
     timezone: z
       .string()
@@ -42,7 +48,24 @@ export const updateProfileSchema = z
   })
   .refine((v) => Object.keys(v).length > 0, {
     message: "Provide at least one field to update.",
-  });
+  })
+  .refine(
+    (v) => {
+      // The three percentages only mean anything together, so they must be
+      // sent together and must total 100 — otherwise a partial update could
+      // leave a stored split that doesn't describe a whole day.
+      const supplied = [v.proteinPct, v.carbsPct, v.fatPct].filter(
+        (n) => n !== undefined,
+      );
+      if (supplied.length === 0) return true;
+      if (supplied.length !== 3) return false;
+      return v.proteinPct! + v.carbsPct! + v.fatPct! === 100;
+    },
+    {
+      path: ["proteinPct"],
+      message: "Send all three macro percentages together, totalling 100.",
+    },
+  );
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 

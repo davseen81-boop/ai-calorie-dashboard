@@ -34,6 +34,14 @@ import {
   listTimeZones,
   timeZoneOffsetLabel,
 } from "@/lib/timezones";
+import {
+  DEFAULT_SPLIT,
+  macroGrams,
+  rebalanceMacros,
+  splitFromGrams,
+  type MacroSplit,
+} from "@/lib/nutrition/macros";
+import { resolveDayCalories } from "@/lib/nutrition/day-targets";
 import type { Theme } from "@/lib/db/schema";
 
 const SUGGESTED_PREFERENCES = [
@@ -55,9 +63,9 @@ export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
 
   const [calories, setCalories] = useState(2000);
-  const [protein, setProtein] = useState(150);
-  const [carbs, setCarbs] = useState(200);
-  const [fat, setFat] = useState(65);
+  const [restCalories, setRestCalories] = useState<number | null>(null);
+  const [activeCalories, setActiveCalories] = useState<number | null>(null);
+  const [split, setSplit] = useState<MacroSplit>(DEFAULT_SPLIT);
   const [preferences, setPreferences] = useState<string[]>([]);
   const [customPreference, setCustomPreference] = useState("");
   const [timezone, setTimezone] = useState("UTC");
@@ -72,9 +80,13 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!profile.data || loaded) return;
     setCalories(profile.data.dailyCalorieGoal);
-    setProtein(profile.data.proteinGoalG);
-    setCarbs(profile.data.carbsGoalG);
-    setFat(profile.data.fatGoalG);
+    setRestCalories(profile.data.restDayCalories);
+    setActiveCalories(profile.data.activeDayCalories);
+    setSplit({
+      protein: profile.data.proteinPct,
+      carbs: profile.data.carbsPct,
+      fat: profile.data.fatPct,
+    });
     setPreferences(profile.data.dietaryPreferences);
     setTimezone(profile.data.timezone);
     setLoaded(true);
@@ -111,18 +123,27 @@ export default function SettingsPage() {
     );
   }
 
-  // Macro goals imply a calorie total; if it drifts far from the calorie goal
-  // the targets contradict each other, so surface it rather than silently
-  // storing an inconsistent set.
-  const macroCalories = protein * 4 + carbs * 4 + fat * 9;
-  const drift = Math.abs(macroCalories - calories);
-  const macrosDisagree = drift > calories * 0.1;
+  // Percentages always total 100 by construction, so there is no longer an
+  // inconsistent state to warn about — the grams are simply derived.
+  const grams = macroGrams(split, calories);
+  const restTarget = resolveDayCalories("rest", {
+    normalGoal: calories,
+    restGoal: restCalories,
+    activeGoal: activeCalories,
+  });
+  const activeTarget = resolveDayCalories("active", {
+    normalGoal: calories,
+    restGoal: restCalories,
+    activeGoal: activeCalories,
+  });
 
   const dirty =
     calories !== profile.data.dailyCalorieGoal ||
-    protein !== profile.data.proteinGoalG ||
-    carbs !== profile.data.carbsGoalG ||
-    fat !== profile.data.fatGoalG ||
+    restCalories !== profile.data.restDayCalories ||
+    activeCalories !== profile.data.activeDayCalories ||
+    split.protein !== profile.data.proteinPct ||
+    split.carbs !== profile.data.carbsPct ||
+    split.fat !== profile.data.fatPct ||
     preferences.join("|") !== profile.data.dietaryPreferences.join("|");
 
   function addPreference(value: string) {
@@ -148,13 +169,24 @@ export default function SettingsPage() {
         saving={update.isPending}
         onSaveMetrics={(metrics) => update.mutate(metrics)}
         onApply={(goals) => {
-          // Mirror into local state so the sliders move with it, rather than
+          // The calculator works in grams; targets are stored as percentages,
+          // so convert once here rather than teaching it about both.
+          const nextSplit = splitFromGrams({
+            proteinG: goals.proteinGoalG,
+            carbsG: goals.carbsGoalG,
+            fatG: goals.fatGoalG,
+          });
+
+          // Mirror into local state so the controls move with it, rather than
           // silently disagreeing with the target just applied.
           setCalories(goals.dailyCalorieGoal);
-          setProtein(goals.proteinGoalG);
-          setCarbs(goals.carbsGoalG);
-          setFat(goals.fatGoalG);
-          update.mutate(goals);
+          setSplit(nextSplit);
+          update.mutate({
+            dailyCalorieGoal: goals.dailyCalorieGoal,
+            proteinPct: nextSplit.protein,
+            carbsPct: nextSplit.carbs,
+            fatPct: nextSplit.fat,
+          });
         }}
       />
 
@@ -162,13 +194,13 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle className="text-base">Daily targets</CardTitle>
           <CardDescription>
-            Your calorie goal drives the progress ring; macro goals drive the
-            donut.
+            A normal day, plus lighter and heavier variants for rest and
+            training days.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <SliderField
-            label="Calories"
+            label="Normal day"
             value={calories}
             min={1000}
             max={5000}
@@ -176,53 +208,100 @@ export default function SettingsPage() {
             unit="kcal"
             onChange={setCalories}
           />
-          <SliderField
-            label="Protein"
-            value={protein}
-            min={0}
-            max={300}
-            step={5}
-            unit="g"
-            accent="protein"
-            onChange={setProtein}
-          />
-          <SliderField
-            label="Carbs"
-            value={carbs}
-            min={0}
-            max={500}
-            step={5}
-            unit="g"
-            accent="carbs"
-            onChange={setCarbs}
-          />
-          <SliderField
-            label="Fat"
-            value={fat}
-            min={0}
-            max={200}
-            step={5}
-            unit="g"
-            accent="fat"
-            onChange={setFat}
-          />
 
-          <div
-            className={cn(
-              "rounded-lg px-3 py-2 text-sm",
-              macrosDisagree
-                ? "bg-warning/10 text-warning"
-                : "bg-secondary/60 text-muted-foreground",
-            )}
-          >
-            Your macros add up to{" "}
-            <span className="font-medium tabular-nums">
-              {macroCalories.toLocaleString()} kcal
-            </span>
-            {macrosDisagree
-              ? ` — that's ${drift.toLocaleString()} away from your calorie goal.`
-              : " — consistent with your calorie goal."}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <DayGoalField
+              label="Rest day"
+              tone="rest"
+              value={restCalories}
+              derived={restTarget}
+              onChange={setRestCalories}
+            />
+            <DayGoalField
+              label="Active day"
+              tone="active"
+              value={activeCalories}
+              derived={activeTarget}
+              onChange={setActiveCalories}
+            />
           </div>
+
+          <p className="rounded-lg bg-secondary/60 px-3 py-2 text-xs text-muted-foreground">
+            Leave these blank and they follow your normal day automatically
+            (&minus;15% and +15%). Cycling only works if the week still averages
+            out — three heavy days without light ones is just eating more.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Macro split</CardTitle>
+          <CardDescription>
+            Percentages of your daily energy. Move one and the others adjust,
+            so the three always total 100%.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {(
+            [
+              { key: "protein", label: "Protein" },
+              { key: "carbs", label: "Carbs" },
+              { key: "fat", label: "Fat" },
+            ] as const
+          ).map((macro) => (
+            <div key={macro.key} className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-2">
+                  <span
+                    className="size-2.5 rounded-full"
+                    style={{ backgroundColor: `hsl(var(--${macro.key}))` }}
+                    aria-hidden
+                  />
+                  {macro.label}
+                </Label>
+                <span className="text-sm font-medium tabular-nums">
+                  {split[macro.key]}%
+                  <span className="ml-2 text-muted-foreground">
+                    {macro.key === "protein"
+                      ? grams.proteinG
+                      : macro.key === "carbs"
+                        ? grams.carbsG
+                        : grams.fatG}
+                    g
+                  </span>
+                </span>
+              </div>
+              <Slider
+                value={[split[macro.key]]}
+                min={0}
+                max={100}
+                step={1}
+                onValueChange={([next]) =>
+                  setSplit((current) =>
+                    rebalanceMacros(current, macro.key, next),
+                  )
+                }
+                aria-label={`${macro.label} percentage`}
+              />
+            </div>
+          ))}
+
+          <div className="flex items-center justify-between rounded-lg bg-secondary/60 px-3 py-2 text-sm">
+            <span className="text-muted-foreground">
+              {split.protein}% · {split.carbs}% · {split.fat}%
+            </span>
+            <span className="font-medium tabular-nums text-success">
+              = {split.protein + split.carbs + split.fat}%
+            </span>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Grams shown are for a normal day. On a{" "}
+            {restTarget.toLocaleString()} kcal rest day or a{" "}
+            {activeTarget.toLocaleString()} kcal active day they scale with the
+            target automatically.
+          </p>
         </CardContent>
       </Card>
 
@@ -460,9 +539,11 @@ export default function SettingsPage() {
           onClick={() =>
             update.mutate({
               dailyCalorieGoal: calories,
-              proteinGoalG: protein,
-              carbsGoalG: carbs,
-              fatGoalG: fat,
+              restDayCalories: restCalories,
+              activeDayCalories: activeCalories,
+              proteinPct: split.protein,
+              carbsPct: split.carbs,
+              fatPct: split.fat,
               dietaryPreferences: preferences,
             })
           }
@@ -527,6 +608,57 @@ function SliderField({
         onValueChange={([next]) => onChange(next)}
         aria-label={`${label} goal`}
       />
+    </div>
+  );
+}
+
+/**
+ * An optional day-type calorie override.
+ *
+ * Empty means "follow the normal day", and the placeholder shows what that
+ * works out to — so leaving it blank is an informed choice rather than a gap.
+ */
+function DayGoalField({
+  label,
+  tone,
+  value,
+  derived,
+  onChange,
+}: {
+  label: string;
+  tone: "rest" | "active";
+  value: number | null;
+  derived: number;
+  onChange: (value: number | null) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label className="flex items-center gap-2">
+        <span
+          className={cn(
+            "size-2.5 rounded-full",
+            tone === "rest" ? "bg-muted-foreground" : "bg-success",
+          )}
+          aria-hidden
+        />
+        {label}
+      </Label>
+      <Input
+        type="number"
+        inputMode="numeric"
+        min={800}
+        max={6000}
+        step={50}
+        value={value ?? ""}
+        placeholder={String(derived)}
+        onChange={(e) => {
+          const parsed = Number.parseInt(e.target.value, 10);
+          onChange(Number.isFinite(parsed) ? parsed : null);
+        }}
+      />
+      <p className="text-xs text-muted-foreground">
+        {value === null ? `Following your normal day: ${derived} kcal` : "Custom"}
+      </p>
     </div>
   );
 }

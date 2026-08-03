@@ -1,4 +1,5 @@
 import type {
+  DayType,
   ExerciseEntryRow,
   MealItemRow,
   MealRow,
@@ -74,7 +75,14 @@ export interface TodaySummary {
   goals: DailyGoals;
   remainingCalories: number;
   goalProgress: number;
+  localDate: string;
   meals: ApiMeal[];
+  day: {
+    type: DayType;
+    baseCalories: number;
+    normalCalories: number;
+    split: { protein: number; carbs: number; fat: number };
+  };
   exercise: {
     entries: ApiExerciseEntry[];
     caloriesBurned: number;
@@ -125,4 +133,4 @@ export interface AnalyzeResponse {
   items: AnalyzedItem[];
 }
 
-export type { MealType };
+export type { MealType, DayType };

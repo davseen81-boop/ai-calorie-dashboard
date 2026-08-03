@@ -5,6 +5,7 @@ import {
   real,
   sqliteTable,
   text,
+  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
 /**
@@ -93,7 +94,35 @@ export const profiles = sqliteTable("profiles", {
   displayName: text("display_name"),
   avatarUrl: text("avatar_url"),
 
+  /** The normal-day target. Rest and active days are relative to it. */
   dailyCalorieGoal: integer("daily_calorie_goal").notNull().default(2000),
+
+  /**
+   * Targets for lighter and heavier days.
+   *
+   * Null means "derive from the normal day" (-15% / +15%), so calorie cycling
+   * works out of the box without asking anyone to invent two more numbers.
+   */
+  restDayCalories: integer("rest_day_calories"),
+  activeDayCalories: integer("active_day_calories"),
+
+  /**
+   * Macro split as percentages of energy, always totalling 100.
+   *
+   * Percentages rather than grams because the calorie target now varies by
+   * day: a fixed 150g of protein means something different at 1,700 kcal than
+   * at 2,300. Grams are derived per day from whichever target applies.
+   */
+  proteinPct: integer("protein_pct").notNull().default(30),
+  carbsPct: integer("carbs_pct").notNull().default(40),
+  fatPct: integer("fat_pct").notNull().default(30),
+
+  /**
+   * @deprecated Superseded by the percentage columns above; kept so the
+   * migration is a pure addition rather than a rename drizzle-kit can only
+   * resolve interactively. Backfilled into the percentages once, then unused —
+   * read nothing from these.
+   */
   proteinGoalG: integer("protein_goal_g").notNull().default(150),
   carbsGoalG: integer("carbs_goal_g").notNull().default(200),
   fatGoalG: integer("fat_goal_g").notNull().default(65),
@@ -179,6 +208,39 @@ export const exerciseEntries = sqliteTable(
 );
 
 export type ExerciseEntryRow = typeof exerciseEntries.$inferSelect;
+
+export const DAY_TYPES = ["rest", "normal", "active"] as const;
+export type DayType = (typeof DAY_TYPES)[number];
+
+/**
+ * A day marked as lighter or heavier than usual.
+ *
+ * Distinct from logged exercise: this is the plan ("tomorrow is a training
+ * day"), set ahead or on the day, whereas an exercise entry is a record of
+ * what actually happened. Both can move the target, and the dashboard shows
+ * each contribution separately so the number is never mysterious.
+ *
+ * Only non-normal days get a row — the absence of one means a normal day.
+ */
+export const dayPlans = sqliteTable(
+  "day_plans",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().default(DEFAULT_USER_ID),
+    /** Local calendar date, `yyyy-MM-dd`, in the profile's timezone. */
+    date: text("date").notNull(),
+    dayType: text("day_type", { enum: DAY_TYPES }).notNull(),
+    ...timestamps,
+  },
+  (table) => ({
+    userDateIdx: uniqueIndex("day_plans_user_date_idx").on(
+      table.userId,
+      table.date,
+    ),
+  }),
+);
+
+export type DayPlanRow = typeof dayPlans.$inferSelect;
 
 /**
  * One logged meal. Macro totals are denormalised here and recomputed by

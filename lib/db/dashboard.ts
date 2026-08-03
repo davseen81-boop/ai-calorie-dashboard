@@ -9,7 +9,11 @@ import { getOrCreateProfile } from "./queries";
 import { listMeals } from "./queries";
 import { listExercise, sumExerciseCalories } from "./exercise";
 import { buildAdvice, type TargetAdvice } from "@/lib/nutrition/exercise";
-import type { ExerciseEntryRow, MealWithItems } from "./schema";
+import { resolveDayTargets } from "@/lib/nutrition/day-targets";
+import { macroGrams } from "@/lib/nutrition/macros";
+import { getDayType } from "./day-plans";
+import { localDateString } from "@/lib/date";
+import type { DayType, ExerciseEntryRow, MealWithItems } from "./schema";
 
 /** Aggregates backing /api/dashboard/today and /api/dashboard/weekly. */
 
@@ -36,7 +40,15 @@ export interface TodaySummary {
   remainingCalories: number;
   /** 0..1+, uncapped so the ring can show an overshoot. */
   goalProgress: number;
+  /** Local calendar date, `yyyy-MM-dd` — the key for day plans. */
+  localDate: string;
   meals: MealWithItems[];
+  day: {
+    type: DayType;
+    baseCalories: number;
+    normalCalories: number;
+    split: { protein: number; carbs: number; fat: number };
+  };
   exercise: {
     entries: ExerciseEntryRow[];
     /** Net calories burned today. */
@@ -118,20 +130,38 @@ export async function getTodaySummary(
   ]);
 
   const adjustsTarget = profile.adjustTargetForExercise;
-  const baseGoal = profile.dailyCalorieGoal;
+  const localDate = localDateString(now, profile.timezone);
+  const dayType = await getDayType(localDate, userId);
 
-  // Exercise raises the calorie target only. Macro goals are left alone: a
-  // 300 kcal run doesn't change how much protein the day needs, and scaling
-  // them would silently move three targets the user never set.
+  const split = {
+    protein: profile.proteinPct,
+    carbs: profile.carbsPct,
+    fat: profile.fatPct,
+  };
+
+  // Composes the three inputs — normal goal, day type, logged exercise — and
+  // derives macro grams from the resulting target so the split always
+  // describes the day actually in front of the user.
+  const targets = resolveDayTargets({
+    dayType,
+    normalGoal: profile.dailyCalorieGoal,
+    restGoal: profile.restDayCalories,
+    activeGoal: profile.activeDayCalories,
+    split,
+    exerciseBurned: burned,
+    adjustForExercise: adjustsTarget,
+  });
+
   const goals: DailyGoals = {
-    calories: baseGoal + (adjustsTarget ? burned : 0),
-    proteinG: profile.proteinGoalG,
-    carbsG: profile.carbsGoalG,
-    fatG: profile.fatGoalG,
+    calories: targets.calories,
+    proteinG: targets.macros.proteinG,
+    carbsG: targets.macros.carbsG,
+    fatG: targets.macros.fatG,
   };
 
   return {
     date: start.toISOString(),
+    localDate,
     timezone: profile.timezone,
     consumed,
     goals,
@@ -140,15 +170,23 @@ export async function getTodaySummary(
     // database could still contain.
     goalProgress: goals.calories > 0 ? consumed.calories / goals.calories : 0,
     meals: todaysMeals,
+    day: {
+      type: dayType,
+      /** The day-type target before exercise. */
+      baseCalories: targets.baseCalories,
+      /** The normal-day figure, so the UI can show the difference. */
+      normalCalories: targets.normalCalories,
+      split,
+    },
     exercise: {
       entries: exerciseEntries,
       caloriesBurned: burned,
       adjustsTarget,
-      baseGoal,
+      baseGoal: targets.baseCalories,
     },
     advice: buildAdvice({
       consumed: consumed.calories,
-      baseGoal,
+      baseGoal: targets.baseCalories,
       exerciseBurned: adjustsTarget ? burned : 0,
       adjustedGoal: goals.calories,
       hoursLeftInDay: Math.max(
@@ -187,9 +225,10 @@ export async function getWeeklySummary(
 
   const goals: DailyGoals = {
     calories: profile.dailyCalorieGoal,
-    proteinG: profile.proteinGoalG,
-    carbsG: profile.carbsGoalG,
-    fatG: profile.fatGoalG,
+    ...macroGrams(
+      { protein: profile.proteinPct, carbs: profile.carbsPct, fat: profile.fatPct },
+      profile.dailyCalorieGoal,
+    ),
   };
 
   // One aggregate query per day. At 7 days against SQLite this is cheaper than

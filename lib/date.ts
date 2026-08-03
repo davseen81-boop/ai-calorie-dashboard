@@ -66,6 +66,20 @@ export function recentDayRanges(
   });
 }
 
+/**
+ * `yyyy-MM-dd` in the user's zone.
+ *
+ * The key day plans are stored under, so it must agree with `dayRangeInZone`
+ * about where a day starts — both derive from the same zoned conversion.
+ */
+export function localDateString(
+  at: Date,
+  timeZone: string,
+): string {
+  const zone = isValidTimeZone(timeZone) ? timeZone : "UTC";
+  return format(toZonedTime(at, zone), "yyyy-MM-dd");
+}
+
 /** `HH:mm` in the user's zone — passed to the model to infer meal type. */
 export function localTimeLabel(
   timeZone: string,
