@@ -310,6 +310,64 @@ export async function updateMeal(
   return getMealById(mealId, userId);
 }
 
+export interface FrequentFood {
+  name: string;
+  /** How many times it has been logged in the window. */
+  timesLogged: number;
+  /** The usual portion, averaged. */
+  quantity: number;
+  unit: string;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+}
+
+/**
+ * The foods this user actually eats, most frequent first.
+ *
+ * Backs Jarvis's suggestions. Advice built from someone's own history is worth
+ * far more than a generic one: a meal they have made before is a meal they can
+ * make again, and it already matches their tastes, budget and kitchen.
+ *
+ * Grouped case-insensitively so "Greek yoghurt" and "greek yoghurt" are one
+ * food, and averaged because the same item logged twice rarely has identical
+ * estimates.
+ */
+export async function listFrequentFoods(
+  options: { since: Date; limit?: number },
+  userId: string,
+): Promise<FrequentFood[]> {
+  const rows = await db
+    .select({
+      name: sql<string>`min(${mealItems.name})`,
+      timesLogged: sql<number>`count(*)`,
+      quantity: sql<number>`avg(${mealItems.quantity})`,
+      unit: sql<string>`min(${mealItems.unit})`,
+      calories: sql<number>`avg(${mealItems.calories})`,
+      proteinG: sql<number>`avg(${mealItems.proteinG})`,
+      carbsG: sql<number>`avg(${mealItems.carbsG})`,
+      fatG: sql<number>`avg(${mealItems.fatG})`,
+    })
+    .from(mealItems)
+    .innerJoin(meals, eq(mealItems.mealId, meals.id))
+    .where(and(eq(meals.userId, userId), gte(meals.loggedAt, options.since)))
+    .groupBy(sql`lower(trim(${mealItems.name}))`)
+    .orderBy(desc(sql`count(*)`))
+    .limit(options.limit ?? 25);
+
+  return rows.map((row) => ({
+    name: row.name,
+    timesLogged: row.timesLogged,
+    quantity: round(row.quantity),
+    unit: row.unit,
+    calories: Math.round(row.calories),
+    proteinG: round(row.proteinG),
+    carbsG: round(row.carbsG),
+    fatG: round(row.fatG),
+  }));
+}
+
 export async function deleteMeal(
   mealId: string,
   userId: string,

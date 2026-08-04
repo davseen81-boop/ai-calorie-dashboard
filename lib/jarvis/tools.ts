@@ -7,6 +7,7 @@ import {
   createMeal,
   deleteMeal,
   getOrCreateProfile,
+  listFrequentFoods,
   updateMeal,
 } from "@/lib/db/queries";
 import { createExercise } from "@/lib/db/exercise";
@@ -82,6 +83,15 @@ const scaleMealArgs = z.object({
   // Bounded because the model, not the user, picks this number: 0.05 is a
   // taste and 10 is ten portions, and anything outside that is a mistake.
   factor: z.number().gt(0).max(10),
+});
+
+const estimateExerciseArgs = z.object({
+  minutes: z.number().int().min(1).max(1440),
+  activity_key: z.string().trim().min(1).max(60),
+});
+
+const recentFoodsArgs = z.object({
+  days: z.number().int().min(1).max(90).default(21),
 });
 
 const setDayTypeArgs = z.object({ day_type: z.enum(TRAINING_DAY_TYPES) });
@@ -351,6 +361,115 @@ const TOOLS: JarvisTool[] = [
           tool: "log_exercise",
           summary: `Logged ${entry.name}, ${entry.durationMinutes} min — ${entry.caloriesBurned} kcal`,
           mutating: true,
+        },
+      };
+    },
+  },
+
+  {
+    spec: {
+      name: "estimate_exercise",
+      description:
+        "Work out what a session WOULD burn and what it would do to today's " +
+        "target, without logging anything. Use this for training the user is " +
+        "considering — 'if I add a gym session tonight, can I eat more?'. Log it " +
+        "with log_exercise only once they have actually done it.",
+      parameters: {
+        type: "object",
+        properties: {
+          minutes: { type: "integer", minimum: 1, maximum: 1440 },
+          activity_key: {
+            type: "string",
+            enum: ACTIVITY_KEYS,
+            description: "The closest match from the supported activities.",
+          },
+        },
+        required: ["minutes", "activity_key"],
+      },
+    },
+    async run(args, ctx) {
+      const input = estimateExerciseArgs.parse(args);
+      const activity = findActivity(input.activity_key);
+
+      if (!activity) {
+        return {
+          output: { error: `No activity called "${input.activity_key}".` },
+        };
+      }
+
+      const profile = await getOrCreateProfile(ctx.userId);
+      const burned = estimateCaloriesBurned({
+        met: activity.met,
+        minutes: input.minutes,
+        weightKg: profile.weightKg,
+      });
+
+      const snapshot = await todaySnapshot(ctx);
+      // Whether a workout raises the target is a profile setting people
+      // genuinely disagree on, so the answer has to say which way it is set
+      // rather than assuming the calories are "earned".
+      const raises = snapshot.exercise_raises_target === true;
+      const target = Number(snapshot.calorie_target ?? 0);
+      const remaining = Number(snapshot.calories_remaining ?? 0);
+
+      return {
+        output: {
+          activity: activity.label,
+          minutes: input.minutes,
+          calories_burned: burned,
+          would_raise_target: raises,
+          target_now: target,
+          target_if_done: raises ? target + burned : target,
+          remaining_now: remaining,
+          remaining_if_done: raises ? remaining + burned : remaining,
+          note: raises
+            ? "Nothing has been logged. These figures apply once the session is done and logged."
+            : "This user has chosen not to let exercise raise the target, so doing this widens the deficit instead of earning food.",
+        },
+      };
+    },
+  },
+
+  {
+    spec: {
+      name: "list_recent_foods",
+      description:
+        "The foods this user has actually logged recently, most frequent first, " +
+        "with their usual portion and nutrition. Call this before suggesting what " +
+        "to eat — a meal they already make beats a generic recommendation.",
+      parameters: {
+        type: "object",
+        properties: {
+          days: {
+            type: "integer",
+            minimum: 1,
+            maximum: 90,
+            description: "How far back to look. Defaults to 21.",
+          },
+        },
+      },
+    },
+    async run(args, ctx) {
+      const { days } = recentFoodsArgs.parse(args);
+      const since = new Date(ctx.now.getTime() - days * 24 * 60 * 60 * 1000);
+
+      const foods = await listFrequentFoods({ since, limit: 25 }, ctx.userId);
+
+      return {
+        output: {
+          days,
+          foods: foods.map((food) => ({
+            name: food.name,
+            times_logged: food.timesLogged,
+            usual_portion: `${food.quantity} ${food.unit}`,
+            calories: food.calories,
+            protein_g: food.proteinG,
+            carbs_g: food.carbsG,
+            fat_g: food.fatG,
+          })),
+          ...(foods.length === 0
+            ? { note: "Nothing logged in this window — suggest ordinary foods instead." }
+            : {}),
         },
       };
     },

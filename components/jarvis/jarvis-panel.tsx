@@ -21,10 +21,10 @@ import { useJarvis, type ChatMessage } from "./jarvis-provider";
  * log food.
  */
 const SUGGESTIONS = [
-  "What's left today?",
+  "What should I eat tonight?",
   "Two eggs on toast and a flat white",
-  "I ran for 30 minutes",
-  "Make today an active day",
+  "Can I eat more if I train tonight?",
+  "What's left today?",
 ];
 
 export function JarvisPanel() {
@@ -83,8 +83,9 @@ export function JarvisPanel() {
           {messages.length === 0 ? (
             <div className="space-y-3 pt-4">
               <p className="text-sm text-muted-foreground">
-                I can log meals and workouts, set today as a rest or active day,
-                and tell you what&apos;s left against your target.
+                I can log meals and workouts, suggest what to eat with the
+                calories you have left, and work out whether an extra session
+                earns you more.
               </p>
               <div className="flex flex-wrap gap-2">
                 {SUGGESTIONS.map((suggestion) => (
