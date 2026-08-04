@@ -4,14 +4,14 @@ import { z } from "zod";
 import { handleRouteError, ok } from "@/lib/api/response";
 import { requireUserId } from "@/lib/auth/session";
 import { setDayType } from "@/lib/db/day-plans";
-import { DAY_TYPES } from "@/lib/db/schema";
+import { TRAINING_DAY_TYPES } from "@/lib/db/schema";
 
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
   /** Local calendar date, `yyyy-MM-dd`, as the dashboard computed it. */
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a yyyy-MM-dd date."),
-  dayType: z.enum(DAY_TYPES),
+  dayType: z.enum(TRAINING_DAY_TYPES),
 });
 
 /**

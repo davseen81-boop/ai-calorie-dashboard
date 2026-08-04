@@ -209,18 +209,31 @@ export const exerciseEntries = sqliteTable(
 
 export type ExerciseEntryRow = typeof exerciseEntries.$inferSelect;
 
+/**
+ * `normal` is retained so existing rows and migrations stay valid, but nothing
+ * writes it any more: a day is either a rest day or a training day. The middle
+ * option was a third thing to decide every morning, and the honest anchor is
+ * the weekly average, not a per-day "neither".
+ *
+ * @see TRAINING_DAY_TYPES for what the UI actually offers.
+ */
 export const DAY_TYPES = ["rest", "normal", "active"] as const;
 export type DayType = (typeof DAY_TYPES)[number];
 
+/** The two a user can choose between. */
+export const TRAINING_DAY_TYPES = ["rest", "active"] as const;
+export type TrainingDayType = (typeof TRAINING_DAY_TYPES)[number];
+
 /**
- * A day marked as lighter or heavier than usual.
+ * A day explicitly marked as a rest or training day.
  *
  * Distinct from logged exercise: this is the plan ("tomorrow is a training
  * day"), set ahead or on the day, whereas an exercise entry is a record of
  * what actually happened. Both can move the target, and the dashboard shows
  * each contribution separately so the number is never mysterious.
  *
- * Only non-normal days get a row — the absence of one means a normal day.
+ * A row means the user said so for that date. Without one the day is derived
+ * from their weekly training plan, so the common case needs no daily tapping.
  */
 export const dayPlans = sqliteTable(
   "day_plans",
@@ -241,6 +254,42 @@ export const dayPlans = sqliteTable(
 );
 
 export type DayPlanRow = typeof dayPlans.$inferSelect;
+
+/**
+ * A recurring training session — the user's normal week.
+ *
+ * This is what makes a per-day calorie target defensible rather than a guess.
+ * Knowing that Tuesday is a 45-minute run and Thursday is an hour of football
+ * gives an actual figure for what a training day costs, so the difference
+ * between a rest day and a training day can be that number instead of an
+ * arbitrary percentage.
+ *
+ * Deliberately separate from `routine_schedules`, which logs food: this is a
+ * plan the user maintains, and nothing is ever written to the log from it.
+ */
+export const trainingSessions = sqliteTable(
+  "training_sessions",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+
+    /** What the user calls it — "Parkrun", "Leg day". */
+    name: text("name").notNull(),
+    /** A key from lib/nutrition/exercise.ts, for the MET value. */
+    activityKey: text("activity_key"),
+    durationMinutes: integer("duration_minutes").notNull(),
+
+    /** ISO weekdays as CSV — "2,4,6" is Tue, Thu, Sat. */
+    daysOfWeek: text("days_of_week").notNull(),
+
+    ...timestamps,
+  },
+  (table) => ({
+    userIdx: index("training_sessions_user_idx").on(table.userId),
+  }),
+);
+
+export type TrainingSessionRow = typeof trainingSessions.$inferSelect;
 
 /**
  * One logged meal. Macro totals are denormalised here and recomputed by

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { and, eq, gte, lt, sql } from "drizzle-orm";
+import { getISODay, parseISO } from "date-fns";
 
 import { db } from "./index";
 import { meals } from "./schema";
@@ -11,7 +12,7 @@ import { listExercise, sumExerciseCalories } from "./exercise";
 import { buildAdvice, type TargetAdvice } from "@/lib/nutrition/exercise";
 import { resolveDayTargets } from "@/lib/nutrition/day-targets";
 import { macroGrams } from "@/lib/nutrition/macros";
-import { getDayType } from "./day-plans";
+import { resolveDayType, type DayTypeSource } from "./day-plans";
 import { localDateString } from "@/lib/date";
 import type { DayType, ExerciseEntryRow, MealWithItems } from "./schema";
 
@@ -45,6 +46,8 @@ export interface TodaySummary {
   meals: MealWithItems[];
   day: {
     type: DayType;
+    /** Whether the user chose this, or it came from their weekly plan. */
+    source: DayTypeSource;
     baseCalories: number;
     normalCalories: number;
     split: { protein: number; carbs: number; fat: number };
@@ -131,7 +134,11 @@ export async function getTodaySummary(
 
   const adjustsTarget = profile.adjustTargetForExercise;
   const localDate = localDateString(now, profile.timezone);
-  const dayType = await getDayType(localDate, userId);
+  // ISO weekday of the *local* date, so a plan that says "Tuesday" means the
+  // user's Tuesday rather than the server's.
+  const isoWeekday = getISODay(parseISO(localDate));
+  const day = await resolveDayType(localDate, isoWeekday, userId);
+  const dayType = day.type;
 
   const split = {
     protein: profile.proteinPct,
@@ -172,9 +179,11 @@ export async function getTodaySummary(
     meals: todaysMeals,
     day: {
       type: dayType,
+      /** Whether the user chose this, or it came from their weekly plan. */
+      source: day.source,
       /** The day-type target before exercise. */
       baseCalories: targets.baseCalories,
-      /** The normal-day figure, so the UI can show the difference. */
+      /** The baseline figure, so the UI can show the difference. */
       normalCalories: targets.normalCalories,
       split,
     },

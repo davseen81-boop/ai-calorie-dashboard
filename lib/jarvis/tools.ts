@@ -12,7 +12,7 @@ import {
 import { createExercise } from "@/lib/db/exercise";
 import { setDayType } from "@/lib/db/day-plans";
 import { applyRoutine, listRoutines } from "@/lib/db/routines";
-import { DAY_TYPES, MEAL_TYPES } from "@/lib/db/schema";
+import { MEAL_TYPES, TRAINING_DAY_TYPES } from "@/lib/db/schema";
 import {
   ACTIVITIES,
   estimateCaloriesBurned,
@@ -84,7 +84,7 @@ const scaleMealArgs = z.object({
   factor: z.number().gt(0).max(10),
 });
 
-const setDayTypeArgs = z.object({ day_type: z.enum(DAY_TYPES) });
+const setDayTypeArgs = z.object({ day_type: z.enum(TRAINING_DAY_TYPES) });
 const routineArgs = z.object({ routine_id: z.string().trim().min(1).max(64) });
 const mealIdArgs = z.object({ meal_id: z.string().trim().min(1).max(64) });
 
@@ -360,13 +360,15 @@ const TOOLS: JarvisTool[] = [
     spec: {
       name: "set_day_type",
       description:
-        "Mark today as a rest, normal or active day. This is the plan for the " +
-        "day and is separate from logged exercise — rest lowers the target, " +
-        "active raises it, and the macro grams scale with whichever applies.",
+        "Mark today as a rest day or a training day ('active'). This is the " +
+        "plan for the day, separate from logged exercise — rest lowers the " +
+        "target, active raises it, and the macro grams scale with whichever " +
+        "applies. Without an explicit choice the day follows the user's weekly " +
+        "training plan, so only call this when they say today differs from usual.",
       parameters: {
         type: "object",
         properties: {
-          day_type: { type: "string", enum: [...DAY_TYPES] },
+          day_type: { type: "string", enum: [...TRAINING_DAY_TYPES] },
         },
         required: ["day_type"],
       },

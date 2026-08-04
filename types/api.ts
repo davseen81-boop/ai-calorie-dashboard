@@ -79,6 +79,8 @@ export interface TodaySummary {
   meals: ApiMeal[];
   day: {
     type: DayType;
+    /** "explicit" when the user tapped it, "plan" from their weekly training. */
+    source: "explicit" | "plan" | "default";
     baseCalories: number;
     normalCalories: number;
     split: { protein: number; carbs: number; fat: number };
@@ -131,6 +133,38 @@ export interface AnalyzeResponse {
   confidence: number;
   notes: string | null;
   items: AnalyzedItem[];
+}
+
+export interface TrainingSession {
+  id: string;
+  name: string;
+  activityKey: string | null;
+  durationMinutes: number;
+  /** ISO weekdays, 1 = Monday. */
+  daysOfWeek: number[];
+  /** Net calories for one occurrence. */
+  caloriesPerSession: number;
+}
+
+export interface SuggestedTargets {
+  restDayCalories: number;
+  trainingDayCalories: number;
+  difference: number;
+  weeklyAverage: number;
+  flooredAt: number | null;
+}
+
+export interface TrainingPlan {
+  sessions: TrainingSession[];
+  trainingDays: number[];
+  restDayCount: number;
+  weeklyCalories: number;
+  averageDailyCalories: number;
+  typicalTrainingBurn: number;
+  caloriesByWeekday: Record<number, number>;
+  suggested: SuggestedTargets;
+  dailyGoal: number;
+  usingAssumedWeight: boolean;
 }
 
 /** One side effect Jarvis carried out, shown under its reply. */

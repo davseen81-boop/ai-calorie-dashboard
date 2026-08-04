@@ -26,6 +26,7 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { QueryError } from "@/components/ui/query-states";
 import { BmrCalculator } from "@/components/settings/bmr-calculator";
+import { TrainingPlanCard } from "@/components/settings/training-plan";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useProfile, useUpdateProfile } from "@/hooks/use-meals";
@@ -218,7 +219,7 @@ export default function SettingsPage() {
               onChange={setRestCalories}
             />
             <DayGoalField
-              label="Active day"
+              label="Training day"
               tone="active"
               value={activeCalories}
               derived={activeTarget}
@@ -234,6 +235,13 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      <TrainingPlanCard
+        onApply={({ rest, training }) => {
+          setRestCalories(rest);
+          setActiveCalories(training);
+          update.mutate({ restDayCalories: rest, activeDayCalories: training });
+        }}
+      />
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Macro split</CardTitle>
