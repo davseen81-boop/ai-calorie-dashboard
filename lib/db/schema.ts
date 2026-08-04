@@ -31,7 +31,21 @@ import {
 export const DEFAULT_USER_ID = "local-user";
 
 
-export const MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"] as const;
+/**
+ * Ordered as the day runs, with snack last because it belongs to no slot.
+ *
+ * "supper" is a separate meal from "dinner" rather than a synonym — a lighter
+ * later meal for people whose day has both. Safe to extend: the column is plain
+ * text with no CHECK constraint, so the enum is a TypeScript guarantee and
+ * adding a value needs no migration.
+ */
+export const MEAL_TYPES = [
+  "breakfast",
+  "lunch",
+  "dinner",
+  "supper",
+  "snack",
+] as const;
 export const MEAL_SOURCES = ["text", "photo", "manual"] as const;
 export const THEMES = ["light", "dark", "system"] as const;
 

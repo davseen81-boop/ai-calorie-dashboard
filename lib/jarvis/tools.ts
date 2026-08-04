@@ -3,6 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import { getTodaySummary } from "@/lib/db/dashboard";
+import { getDayOutlook } from "@/lib/db/outlook";
 import {
   createMeal,
   deleteMeal,
@@ -88,6 +89,10 @@ const scaleMealArgs = z.object({
 const estimateExerciseArgs = z.object({
   minutes: z.number().int().min(1).max(1440),
   activity_key: z.string().trim().min(1).max(60),
+});
+
+const outlookArgs = z.object({
+  days_ahead: z.number().int().min(0).max(7),
 });
 
 const recentFoodsArgs = z.object({
@@ -425,6 +430,57 @@ const TOOLS: JarvisTool[] = [
           note: raises
             ? "Nothing has been logged. These figures apply once the session is done and logged."
             : "This user has chosen not to let exercise raise the target, so doing this widens the deficit instead of earning food.",
+        },
+      };
+    },
+  },
+
+  {
+    spec: {
+      name: "get_day_outlook",
+      description:
+        "What an upcoming day looks like: its calorie and macro targets, whether " +
+        "the user's weekly plan makes it a rest or training day, and what training " +
+        "is scheduled. Use this before suggesting meals for tomorrow — a training " +
+        "day has a different target from a rest day, and planning against today's " +
+        "figure gets both wrong. This is read-only; nothing can be logged ahead.",
+      parameters: {
+        type: "object",
+        properties: {
+          days_ahead: {
+            type: "integer",
+            minimum: 0,
+            maximum: 7,
+            description: "0 is today, 1 is tomorrow.",
+          },
+        },
+        required: ["days_ahead"],
+      },
+    },
+    async run(args, ctx) {
+      const { days_ahead: daysAhead } = outlookArgs.parse(args);
+      const outlook = await getDayOutlook(ctx.userId, daysAhead, ctx.now);
+
+      return {
+        output: {
+          date: outlook.date,
+          weekday: outlook.weekday,
+          day_type: outlook.dayType,
+          // Lets the model say "your plan has you training" rather than
+          // implying the user chose it.
+          decided_by:
+            outlook.source === "explicit"
+              ? "the user set this day themselves"
+              : outlook.source === "plan"
+                ? "their weekly training plan"
+                : "default, they have no plan set up",
+          calorie_target: outlook.calories,
+          protein_g: outlook.macros.proteinG,
+          carbs_g: outlook.macros.carbsG,
+          fat_g: outlook.macros.fatG,
+          scheduled_training: outlook.sessions,
+          planned_burn: outlook.plannedBurn,
+          note: "The target already accounts for that day's training — do not add the burn to it again.",
         },
       };
     },
