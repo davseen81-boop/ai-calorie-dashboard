@@ -8,7 +8,7 @@ import { summarisePlan, sessionsOnDay } from "@/lib/nutrition/training-plan";
 import { getOrCreateProfile } from "./queries";
 import { resolveDayType, type DayTypeSource } from "./day-plans";
 import { listTrainingSessions } from "./training-plan";
-import type { TrainingDayType } from "./schema";
+import type { DayType } from "./schema";
 
 /**
  * What a day ahead looks like before it happens.
@@ -24,7 +24,7 @@ export interface DayOutlook {
   date: string;
   weekday: string;
   daysAhead: number;
-  dayType: TrainingDayType;
+  dayType: DayType;
   source: DayTypeSource;
   calories: number;
   macros: { proteinG: number; carbsG: number; fatG: number };

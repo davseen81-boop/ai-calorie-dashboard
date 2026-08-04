@@ -83,6 +83,8 @@ export interface TodaySummary {
     source: "explicit" | "plan" | "default";
     baseCalories: number;
     normalCalories: number;
+    /** What each choice is worth, so each button can show its own figure. */
+    options: { rest: number; normal: number; active: number };
     split: { protein: number; carbs: number; fat: number };
   };
   exercise: {
@@ -167,6 +169,52 @@ export interface TrainingPlan {
   usingAssumedWeight: boolean;
 }
 
+export type ReportPeriod = "week" | "month";
+export type DayStatus = "under" | "on_target" | "over" | "not_logged";
+
+export interface ReportDay {
+  date: string;
+  dayType: DayType;
+  target: number;
+  consumed: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  mealCount: number;
+  exerciseCalories: number;
+  status: DayStatus;
+}
+
+export interface PeriodTotals {
+  daysLogged: number;
+  daysElapsed: number;
+  averageConsumed: number;
+  averageTarget: number;
+  difference: number;
+  onTargetDays: number;
+  overDays: number;
+  underDays: number;
+  notLoggedDays: number;
+  /** Null when too little was logged to answer honestly. */
+  metTarget: boolean | null;
+  coverage: number;
+}
+
+export interface PeriodReport {
+  period: ReportPeriod;
+  offset: number;
+  label: string;
+  from: string;
+  to: string;
+  inProgress: boolean;
+  days: ReportDay[];
+  totals: PeriodTotals;
+  macros: {
+    protein: { average: number; target: number };
+    carbs: { average: number; target: number };
+    fat: { average: number; target: number };
+  };
+}
 /** One side effect Jarvis carried out, shown under its reply. */
 export interface JarvisAction {
   tool: string;

@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/select";
 import { ListSkeleton, QueryError } from "@/components/ui/query-states";
 import { MealTimeline } from "@/components/meals/meal-timeline";
+import { PeriodReportView } from "@/components/reports/period-report";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useMeals } from "@/hooks/use-meals";
 import { MEAL_TYPES } from "@/lib/db/schema";
@@ -61,84 +63,102 @@ export default function HistoryPage() {
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">History</h1>
         <p className="text-sm text-muted-foreground">
-          Everything you&apos;ve logged, newest first.
+          How the week and month went, and everything you&apos;ve logged.
         </p>
       </header>
 
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search meals…"
-            className="pl-9"
-            aria-label="Search meals by name"
-          />
-        </div>
+      <Tabs defaultValue="report" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="report">Report</TabsTrigger>
+          <TabsTrigger value="meals">Meals</TabsTrigger>
+        </TabsList>
 
-        <Select
-          value={mealType}
-          onValueChange={(value) => setMealType(value as MealType | typeof ALL)}
-        >
-          <SelectTrigger className="sm:w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>All meals</SelectItem>
-            {MEAL_TYPES.map((type) => (
-              <SelectItem key={type} value={type} className="capitalize">
-                {type}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <TabsContent value="report">
+          <PeriodReportView />
+        </TabsContent>
 
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn("sm:w-44", !date && "text-muted-foreground")}
+        <TabsContent value="meals" className="space-y-4">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search meals…"
+                className="pl-9"
+                aria-label="Search meals by name"
+              />
+            </div>
+
+            <Select
+              value={mealType}
+              onValueChange={(value) =>
+                setMealType(value as MealType | typeof ALL)
+              }
             >
-              <CalendarIcon className="mr-2 size-4" />
-              {date ? format(date, "d MMM yyyy") : "Any date"}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
-            <Calendar
-              mode="single"
-              selected={date}
-              onSelect={setDate}
-              disabled={{ after: new Date() }}
-              autoFocus
+              <SelectTrigger className="sm:w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>All meals</SelectItem>
+                {MEAL_TYPES.map((type) => (
+                  <SelectItem key={type} value={type} className="capitalize">
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn("sm:w-44", !date && "text-muted-foreground")}
+                >
+                  <CalendarIcon className="mr-2 size-4" />
+                  {date ? format(date, "d MMM yyyy") : "Any date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={setDate}
+                  disabled={{ after: new Date() }}
+                  autoFocus
+                />
+              </PopoverContent>
+            </Popover>
+
+            {hasFilters && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setSearch("");
+                  setMealType(ALL);
+                  setDate(undefined);
+                }}
+              >
+                <X className="mr-2 size-4" />
+                Clear
+              </Button>
+            )}
+          </div>
+
+          {meals.isPending ? (
+            <ListSkeleton />
+          ) : meals.isError ? (
+            <QueryError
+              error={meals.error}
+              onRetry={() => void meals.refetch()}
             />
-          </PopoverContent>
-        </Popover>
-
-        {hasFilters && (
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setSearch("");
-              setMealType(ALL);
-              setDate(undefined);
-            }}
-          >
-            <X className="mr-2 size-4" />
-            Clear
-          </Button>
-        )}
-      </div>
-
-      {meals.isPending ? (
-        <ListSkeleton />
-      ) : meals.isError ? (
-        <QueryError error={meals.error} onRetry={() => void meals.refetch()} />
-      ) : meals.data.meals.length === 0 ? (
-        <EmptyState hasFilters={hasFilters} />
-      ) : (
-        <GroupedMeals meals={meals.data.meals} />
-      )}
+          ) : meals.data.meals.length === 0 ? (
+            <EmptyState hasFilters={hasFilters} />
+          ) : (
+            <GroupedMeals meals={meals.data.meals} />
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

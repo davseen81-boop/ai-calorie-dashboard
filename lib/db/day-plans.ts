@@ -4,19 +4,15 @@ import { and, eq, gte, inArray, lte } from "drizzle-orm";
 
 import { db } from "./index";
 import { listTrainingSessions } from "./training-plan";
-import {
-  dayPlans,
-  type DayPlanRow,
-  type DayType,
-  type TrainingDayType,
-} from "./schema";
+import { dayPlans, type DayPlanRow, type DayType } from "./schema";
 
 /**
  * Planned day types.
  *
- * Only non-normal days are stored — a missing row means a normal day. That
- * keeps the table proportional to how often someone actually deviates, rather
- * than one row per day forever.
+ * A row means the user chose that day's type themselves. A missing row does
+ * not mean "normal" — it means "decide from my weekly training plan", which is
+ * what keeps the table proportional to how often someone overrides rather than
+ * one row per day forever.
  */
 
 export async function getDayType(
@@ -33,7 +29,7 @@ export async function getDayType(
 export type DayTypeSource = "explicit" | "plan" | "default";
 
 export interface ResolvedDayType {
-  type: TrainingDayType;
+  type: DayType;
   source: DayTypeSource;
 }
 
@@ -43,8 +39,12 @@ export interface ResolvedDayType {
  * Order matters: an explicit tap for this date always wins, because it records
  * what actually happened rather than what was scheduled. Otherwise the weekly
  * plan decides, which is the point of having one — a normal week should need no
- * daily tapping at all. With no plan and no tap, a day is a rest day: training
- * is something you did, and the app should not assume you did it.
+ * daily tapping at all.
+ *
+ * With **no plan at all** a day is normal, not rest. Cycling only makes sense
+ * against a plan that says which days are which; without one, quietly holding
+ * someone 15% under their goal every day they forget to tap is a deficit they
+ * never asked for.
  */
 export async function resolveDayType(
   date: string,
@@ -55,20 +55,18 @@ export async function resolveDayType(
     where: and(eq(dayPlans.userId, userId), eq(dayPlans.date, date)),
   });
 
-  if (row) {
-    // "normal" can only come from a row written before the two-way switch;
-    // it reads as a rest day now.
-    return { type: row.dayType === "active" ? "active" : "rest", source: "explicit" };
-  }
+  if (row) return { type: row.dayType, source: "explicit" };
 
   const sessions = await listTrainingSessions(userId);
+  if (sessions.length === 0) return { type: "normal", source: "default" };
+
   const trains = sessions.some((session) =>
     session.daysOfWeek.includes(isoWeekday),
   );
 
-  return trains
-    ? { type: "active", source: "plan" }
-    : { type: "rest", source: sessions.length > 0 ? "plan" : "default" };
+  // With a plan, the non-training days are what pay for the training ones —
+  // that is the arrangement the suggested targets were built around.
+  return { type: trains ? "active" : "rest", source: "plan" };
 }
 
 export async function listDayPlans(
@@ -87,16 +85,15 @@ export async function listDayPlans(
 /**
  * Record the user's choice for a date.
  *
- * Both values are stored now, including rest. Absence no longer means "normal"
- * — it means "follow my weekly plan" — so choosing rest on a day the plan calls
- * a training day has to be written down or it would be silently overridden on
- * the next page load.
+ * Every value is stored, including "normal". Absence means "follow my weekly
+ * plan", so choosing normal on a day the plan calls a training day has to be
+ * written down or it would be silently overridden on the next page load.
  */
 export async function setDayType(
   date: string,
-  dayType: TrainingDayType,
+  dayType: DayType,
   userId: string,
-): Promise<TrainingDayType> {
+): Promise<DayType> {
   await db
     .insert(dayPlans)
     .values({ id: crypto.randomUUID(), userId, date, dayType })

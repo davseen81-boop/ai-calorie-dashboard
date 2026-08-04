@@ -224,19 +224,14 @@ export const exerciseEntries = sqliteTable(
 export type ExerciseEntryRow = typeof exerciseEntries.$inferSelect;
 
 /**
- * `normal` is retained so existing rows and migrations stay valid, but nothing
- * writes it any more: a day is either a rest day or a training day. The middle
- * option was a third thing to decide every morning, and the honest anchor is
- * the weekly average, not a per-day "neither".
+ * Ordered lightest to heaviest, which is also how they are shown.
  *
- * @see TRAINING_DAY_TYPES for what the UI actually offers.
+ * `normal` is the daily goal untouched — the weekly average. It exists because
+ * cycling is a choice, not an obligation: someone tracking against one steady
+ * figure should not be pushed into a deficit just because they did not train.
  */
 export const DAY_TYPES = ["rest", "normal", "active"] as const;
 export type DayType = (typeof DAY_TYPES)[number];
-
-/** The two a user can choose between. */
-export const TRAINING_DAY_TYPES = ["rest", "active"] as const;
-export type TrainingDayType = (typeof TRAINING_DAY_TYPES)[number];
 
 /**
  * A day explicitly marked as a rest or training day.

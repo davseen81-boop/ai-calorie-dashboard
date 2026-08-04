@@ -10,7 +10,10 @@ import { getOrCreateProfile } from "./queries";
 import { listMeals } from "./queries";
 import { listExercise, sumExerciseCalories } from "./exercise";
 import { buildAdvice, type TargetAdvice } from "@/lib/nutrition/exercise";
-import { resolveDayTargets } from "@/lib/nutrition/day-targets";
+import {
+  resolveDayCalories,
+  resolveDayTargets,
+} from "@/lib/nutrition/day-targets";
 import { macroGrams } from "@/lib/nutrition/macros";
 import { resolveDayType, type DayTypeSource } from "./day-plans";
 import { localDateString } from "@/lib/date";
@@ -50,6 +53,8 @@ export interface TodaySummary {
     source: DayTypeSource;
     baseCalories: number;
     normalCalories: number;
+    /** What each choice is worth. */
+    options: { rest: number; normal: number; active: number };
     split: { protein: number; carbs: number; fat: number };
   };
   exercise: {
@@ -149,11 +154,15 @@ export async function getTodaySummary(
   // Composes the three inputs — normal goal, day type, logged exercise — and
   // derives macro grams from the resulting target so the split always
   // describes the day actually in front of the user.
-  const targets = resolveDayTargets({
-    dayType,
+  const goalInputs = {
     normalGoal: profile.dailyCalorieGoal,
     restGoal: profile.restDayCalories,
     activeGoal: profile.activeDayCalories,
+  };
+
+  const targets = resolveDayTargets({
+    dayType,
+    ...goalInputs,
     split,
     exerciseBurned: burned,
     adjustForExercise: adjustsTarget,
@@ -185,6 +194,13 @@ export async function getTodaySummary(
       baseCalories: targets.baseCalories,
       /** The baseline figure, so the UI can show the difference. */
       normalCalories: targets.normalCalories,
+      /** What each choice is worth, so the buttons can carry their own number
+       *  instead of making the user tap one to find out. */
+      options: {
+        rest: resolveDayCalories("rest", goalInputs),
+        normal: resolveDayCalories("normal", goalInputs),
+        active: resolveDayCalories("active", goalInputs),
+      },
       split,
     },
     exercise: {
