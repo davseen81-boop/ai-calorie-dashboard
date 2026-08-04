@@ -24,17 +24,34 @@ export interface BodyMetrics {
   goalType: GoalType;
 }
 
+/**
+ * How much you move **outside** deliberate training.
+ *
+ * The textbook ladder ("moderate exercise 3–5 days a week" → ×1.55) bundles
+ * training into the multiplier. That was fine when the multiplier was the only
+ * thing there was, but this app also knows the user's actual weekly sessions —
+ * and counting the same runs in both places inflates the target by hundreds of
+ * calories a day.
+ *
+ * So the question is now about daily life only — job, commute, errands — and
+ * training is added on top from real MET arithmetic. The multipliers are
+ * correspondingly lower, topping out around 1.7 for heavy manual work rather
+ * than 1.9 for someone who also trains twice a day.
+ *
+ * The stored keys are unchanged so existing profiles stay valid; what each one
+ * means has narrowed.
+ */
 export const ACTIVITY_OPTIONS: Array<{
   value: ActivityLevel;
   label: string;
   description: string;
   multiplier: number;
 }> = [
-  { value: "sedentary", label: "Sedentary", description: "Desk job, little exercise", multiplier: 1.2 },
-  { value: "light", label: "Lightly active", description: "Light exercise 1–3 days a week", multiplier: 1.375 },
-  { value: "moderate", label: "Moderately active", description: "Moderate exercise 3–5 days a week", multiplier: 1.55 },
-  { value: "active", label: "Very active", description: "Hard exercise 6–7 days a week", multiplier: 1.725 },
-  { value: "very_active", label: "Extremely active", description: "Physical job or twice-daily training", multiplier: 1.9 },
+  { value: "sedentary", label: "Mostly sitting", description: "Desk job, drive, little walking", multiplier: 1.2 },
+  { value: "light", label: "Lightly active", description: "Some walking and light chores", multiplier: 1.3 },
+  { value: "moderate", label: "On your feet often", description: "Teaching, retail, small children", multiplier: 1.4 },
+  { value: "active", label: "Physically active job", description: "Trades, warehouse, delivery", multiplier: 1.55 },
+  { value: "very_active", label: "Heavy manual work", description: "Construction, farming, labouring", multiplier: 1.7 },
 ];
 
 export const GOAL_OPTIONS: Array<{
@@ -74,16 +91,35 @@ export function calculateBmr(metrics: BodyMetrics): number {
   return metrics.sex === "male" ? base + 5 : base - 161;
 }
 
-/** Total daily energy expenditure: BMR scaled by how much you move. */
-export function calculateTdee(metrics: BodyMetrics): number {
+/** BMR scaled for daily life — everything except deliberate training. */
+export function calculateDailyLiving(metrics: BodyMetrics): number {
   const activity =
     ACTIVITY_OPTIONS.find((o) => o.value === metrics.activityLevel)?.multiplier ??
     1.2;
   return calculateBmr(metrics) * activity;
 }
 
+/**
+ * Total daily energy expenditure.
+ *
+ * `trainingPerDay` is the user's weekly training burn spread across seven days,
+ * from their actual sessions. It is added rather than folded into the
+ * multiplier, which is the whole point: one term for living, one for training,
+ * each counted exactly once.
+ */
+export function calculateTdee(
+  metrics: BodyMetrics,
+  trainingPerDay = 0,
+): number {
+  return calculateDailyLiving(metrics) + Math.max(0, trainingPerDay);
+}
+
 export interface EnergyEstimate {
   bmr: number;
+  /** BMR × the daily-life multiplier, before training. */
+  dailyLiving: number;
+  /** Weekly training burn averaged over seven days. */
+  trainingPerDay: number;
   tdee: number;
   /** TDEE after the goal adjustment, before the floor. */
   rawTarget: number;
@@ -96,9 +132,22 @@ export interface EnergyEstimate {
   macros: { proteinG: number; carbsG: number; fatG: number };
 }
 
-export function estimateEnergy(metrics: BodyMetrics): EnergyEstimate {
+/**
+ * The daily target, as a weekly average.
+ *
+ * This is deliberately one number for the whole week, not a per-day figure.
+ * Splitting it into rest and training days is a separate step
+ * (`suggestTargets` in ./training-plan) which only reshapes the week — the
+ * total it distributes is exactly what comes out of here.
+ */
+export function estimateEnergy(
+  metrics: BodyMetrics,
+  trainingPerDay = 0,
+): EnergyEstimate {
   const bmr = calculateBmr(metrics);
-  const tdee = calculateTdee(metrics);
+  const dailyLiving = calculateDailyLiving(metrics);
+  const training = Math.max(0, trainingPerDay);
+  const tdee = dailyLiving + training;
 
   const adjustment =
     GOAL_OPTIONS.find((o) => o.value === metrics.goalType)?.adjustment ?? 0;
@@ -109,6 +158,8 @@ export function estimateEnergy(metrics: BodyMetrics): EnergyEstimate {
 
   return {
     bmr: Math.round(bmr),
+    dailyLiving: Math.round(dailyLiving),
+    trainingPerDay: Math.round(training),
     tdee: Math.round(tdee),
     rawTarget: Math.round(rawTarget),
     target: Math.round(target / 10) * 10,

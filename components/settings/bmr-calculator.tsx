@@ -29,6 +29,7 @@ import {
   type BodyMetrics,
 } from "@/lib/nutrition/energy";
 import { BIOLOGICAL_SEXES } from "@/lib/db/schema";
+import { useTrainingPlan } from "@/hooks/use-training-plan";
 import type { ApiProfile } from "@/types/api";
 
 interface Props {
@@ -63,9 +64,15 @@ export function BmrCalculator({ profile, saving, onSaveMetrics, onApply }: Props
     goalType: profile.goalType ?? undefined,
   });
 
+  // The weekly plan supplies the training term. Without one it is zero, and
+  // the estimate is daily living only — which is correct, not a gap.
+  const plan = useTrainingPlan();
+  const trainingPerDay = plan.data?.averageDailyCalories ?? 0;
+
   const estimate = useMemo(
-    () => (hasCompleteMetrics(draft) ? estimateEnergy(draft) : null),
-    [draft],
+    () =>
+      hasCompleteMetrics(draft) ? estimateEnergy(draft, trainingPerDay) : null,
+    [draft, trainingPerDay],
   );
 
   function update(patch: Partial<BodyMetrics>) {
@@ -138,7 +145,7 @@ export function BmrCalculator({ profile, saving, onSaveMetrics, onApply }: Props
         </div>
 
         <div className="space-y-2">
-          <Label>Activity level</Label>
+          <Label>Daily life, not counting training</Label>
           <Select
             value={draft.activityLevel ?? ""}
             onValueChange={(v) =>
@@ -146,7 +153,7 @@ export function BmrCalculator({ profile, saving, onSaveMetrics, onApply }: Props
             }
           >
             <SelectTrigger>
-              <SelectValue placeholder="How active are you?" />
+              <SelectValue placeholder="How active is a normal day?" />
             </SelectTrigger>
             <SelectContent>
               {ACTIVITY_OPTIONS.map((option) => (
@@ -159,6 +166,11 @@ export function BmrCalculator({ profile, saving, onSaveMetrics, onApply }: Props
               ))}
             </SelectContent>
           </Select>
+          <p className="text-xs text-muted-foreground">
+            Job, commute and errands only. Your workouts are counted separately
+            from your training week, so leave them out here — describing them
+            twice is what inflates a target by hundreds of calories.
+          </p>
         </div>
 
         <div className="space-y-2">
@@ -187,20 +199,45 @@ export function BmrCalculator({ profile, saving, onSaveMetrics, onApply }: Props
 
         {estimate ? (
           <div className="space-y-3 rounded-xl border bg-secondary/40 p-4">
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <Figure label="At rest" value={estimate.bmr} hint="BMR" />
-              <Figure label="You burn" value={estimate.tdee} hint="daily" />
-              <Figure
-                label="Target"
-                value={estimate.target}
-                hint={
-                  estimate.adjustment === 0
-                    ? "maintain"
-                    : `${estimate.adjustment > 0 ? "+" : ""}${estimate.adjustment}`
-                }
-                emphasis
+            {/* Shown as a sum rather than one figure, so it is visible that
+                living and training are each counted once. */}
+            <dl className="space-y-1.5 text-sm">
+              <Line label="At rest (BMR)" value={estimate.bmr} />
+              <Line
+                label="Daily life on top"
+                value={estimate.dailyLiving - estimate.bmr}
+                signed
               />
-            </div>
+              <Line
+                label="Training, per day"
+                value={estimate.trainingPerDay}
+                signed
+                muted={estimate.trainingPerDay === 0}
+              />
+              <div className="flex justify-between border-t pt-1.5 font-medium">
+                <dt>You burn</dt>
+                <dd className="tabular-nums">
+                  {estimate.tdee.toLocaleString()} kcal
+                </dd>
+              </div>
+              <Line
+                label={estimate.adjustment === 0 ? "Maintain" : "Your goal"}
+                value={estimate.adjustment}
+                signed
+              />
+              <div className="flex justify-between border-t pt-1.5 text-base font-semibold text-primary">
+                <dt>Daily target</dt>
+                <dd className="tabular-nums">
+                  {estimate.target.toLocaleString()} kcal
+                </dd>
+              </div>
+            </dl>
+
+            <p className="text-xs text-muted-foreground">
+              {estimate.trainingPerDay > 0
+                ? `Includes ${estimate.trainingPerDay} kcal a day averaged from your training week. This is a weekly average — rest and training days split it below without changing the total.`
+                : "No training week set up yet, so this is daily life only. Add your sessions below and they'll be counted here."}
+            </p>
 
             <p className="text-xs text-muted-foreground">
               Suggested macros: {estimate.macros.proteinG}g protein ·{" "}
@@ -261,29 +298,28 @@ export function BmrCalculator({ profile, saving, onSaveMetrics, onApply }: Props
   );
 }
 
-function Figure({
+/** One row of the working. `signed` marks it as a term being added. */
+function Line({
   label,
   value,
-  hint,
-  emphasis = false,
+  signed = false,
+  muted = false,
 }: {
   label: string;
   value: number;
-  hint: string;
-  emphasis?: boolean;
+  signed?: boolean;
+  /** Dimmed when the term is zero, so it reads as absent rather than wrong. */
+  muted?: boolean;
 }) {
   return (
-    <div>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p
-        className={cn(
-          "font-semibold tabular-nums",
-          emphasis ? "text-2xl text-primary" : "text-xl",
-        )}
-      >
-        {value.toLocaleString()}
-      </p>
-      <p className="text-xs text-muted-foreground">{hint}</p>
+    <div
+      className={cn("flex justify-between text-muted-foreground", muted && "opacity-50")}
+    >
+      <dt>{label}</dt>
+      <dd className="tabular-nums">
+        {signed && value >= 0 ? "+" : signed ? "−" : ""}
+        {Math.abs(Math.round(value)).toLocaleString()} kcal
+      </dd>
     </div>
   );
 }
