@@ -1,7 +1,15 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Camera, Loader2, PencilLine, Plus, Sparkles, X } from "lucide-react";
+import {
+  Camera,
+  Image as ImageIcon,
+  Loader2,
+  PencilLine,
+  Plus,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -93,7 +101,10 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
   const [mealType, setMealType] = useState<MealType>("snack");
   const [source, setSource] = useState<"text" | "photo" | "manual">("text");
 
-  const fileInput = useRef<HTMLInputElement>(null);
+  // Separate refs because the two inputs differ by the `capture` attribute,
+  // which cannot be toggled per click — see the inputs below.
+  const libraryInput = useRef<HTMLInputElement>(null);
+  const cameraInput = useRef<HTMLInputElement>(null);
   const analyze = useAnalyzeMeal();
   const save = useSaveMeal();
 
@@ -268,19 +279,35 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
             </TabsContent>
 
             <TabsContent value="photo" className="mt-4 space-y-4">
+              {/* Two inputs, because `capture` is not a preference — a mobile
+                  browser that sees it opens the camera directly and offers no
+                  way to reach the photo library at all. The library input
+                  therefore has to omit it entirely.
+
+                  `accept="image/*"` rather than a list of types: an iPhone
+                  hands over HEIC, which the browser can decode and we re-encode
+                  to JPEG. Naming only JPEG/PNG greys those photos out. */}
               <input
-                ref={fileInput}
+                ref={libraryInput}
                 type="file"
-                // Any image type: an iPhone may hand over HEIC, which the
-                // browser can decode and we re-encode to JPEG. Listing only
-                // JPEG/PNG would grey those photos out in the picker.
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void handleFile(file);
+                  // Reset so picking the same file twice still fires onChange.
+                  e.target.value = "";
+                }}
+              />
+              <input
+                ref={cameraInput}
+                type="file"
                 accept="image/*"
                 capture="environment"
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) void handleFile(file);
-                  // Reset so picking the same file twice still fires onChange.
                   e.target.value = "";
                 }}
               />
@@ -313,30 +340,35 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
                     </span>
                   )}
                 </div>
+              ) : preparing ? (
+                <div className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed py-12 text-muted-foreground">
+                  <Loader2 className="size-8 animate-spin" />
+                  <span className="text-sm font-medium">Preparing photo…</span>
+                </div>
               ) : (
-                <button
-                  type="button"
-                  disabled={preparing}
-                  onClick={() => fileInput.current?.click()}
-                  className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed py-12 text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-60"
-                >
-                  {preparing ? (
-                    <>
-                      <Loader2 className="size-8 animate-spin" />
-                      <span className="text-sm font-medium">Preparing photo…</span>
-                    </>
-                  ) : (
-                    <>
-                      <Camera className="size-8" />
-                      <span className="text-sm font-medium">
-                        Take or choose a photo
-                      </span>
-                      <span className="text-xs">
-                        Any size — it&apos;s resized on your device before upload
-                      </span>
-                    </>
-                  )}
-                </button>
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => libraryInput.current?.click()}
+                      className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed py-10 text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                    >
+                      <ImageIcon className="size-7" />
+                      <span className="text-sm font-medium">Choose photo</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => cameraInput.current?.click()}
+                      className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed py-10 text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                    >
+                      <Camera className="size-7" />
+                      <span className="text-sm font-medium">Take photo</span>
+                    </button>
+                  </div>
+                  <p className="text-center text-xs text-muted-foreground">
+                    Any size — it&apos;s resized on your device before upload.
+                  </p>
+                </div>
               )}
 
               <div className="space-y-2">

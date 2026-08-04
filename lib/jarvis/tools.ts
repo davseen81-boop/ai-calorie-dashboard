@@ -3,7 +3,12 @@ import "server-only";
 import { z } from "zod";
 
 import { getTodaySummary } from "@/lib/db/dashboard";
-import { createMeal, deleteMeal, getOrCreateProfile } from "@/lib/db/queries";
+import {
+  createMeal,
+  deleteMeal,
+  getOrCreateProfile,
+  updateMeal,
+} from "@/lib/db/queries";
 import { createExercise } from "@/lib/db/exercise";
 import { setDayType } from "@/lib/db/day-plans";
 import { applyRoutine, listRoutines } from "@/lib/db/routines";
@@ -70,6 +75,13 @@ const logExerciseArgs = z.object({
   minutes: z.number().int().min(1).max(1440),
   activity_key: z.string().trim().min(1).max(60).optional(),
   calories_burned: z.number().int().min(0).max(10000).optional(),
+});
+
+const scaleMealArgs = z.object({
+  meal_id: z.string().trim().min(1).max(64),
+  // Bounded because the model, not the user, picks this number: 0.05 is a
+  // taste and 10 is ten portions, and anything outside that is a mistake.
+  factor: z.number().gt(0).max(10),
 });
 
 const setDayTypeArgs = z.object({ day_type: z.enum(DAY_TYPES) });
@@ -467,6 +479,88 @@ const TOOLS: JarvisTool[] = [
 
   {
     spec: {
+      name: "scale_meal",
+      description:
+        "Change how much of an already-logged meal was actually eaten. " +
+        "`factor` multiplies what is currently logged: 0.5 for 'I only ate half', " +
+        "2 for 'I went back for the same again'. Every food in the meal and all " +
+        "its macros scale together. Get the id from get_today. Use this instead " +
+        "of deleting and re-logging when only the portion changed.",
+      parameters: {
+        type: "object",
+        properties: {
+          meal_id: { type: "string" },
+          factor: {
+            type: "number",
+            description: "Multiplier against the amount currently logged.",
+          },
+        },
+        required: ["meal_id", "factor"],
+      },
+    },
+    async run(args, ctx) {
+      const { meal_id: mealId, factor } = scaleMealArgs.parse(args);
+
+      // Scoped to today, like delete_meal: a conversational edit should only
+      // reach entries the user can see on the dashboard behind the chat.
+      const summary = await getTodaySummary(ctx.userId, ctx.now);
+      const target = summary.meals.find((meal) => meal.id === mealId);
+
+      if (!target) {
+        return {
+          output: {
+            error:
+              "That meal is not in today's log. Jarvis can only adjust meals " +
+              "logged today — anything older has to be edited from the History page.",
+          },
+        };
+      }
+
+      const before = target.totalCalories;
+
+      // Quantity scales with the nutrition so the row still reads honestly —
+      // "1 slice, 190 kcal" becoming "1 slice, 95 kcal" would be a lie about
+      // the portion rather than a record of eating less of it.
+      const updated = await updateMeal(
+        mealId,
+        {
+          items: target.items.map((item) => ({
+            name: item.name,
+            quantity: round(item.quantity * factor, 2),
+            unit: item.unit,
+            calories: Math.round(item.calories * factor),
+            proteinG: round(item.proteinG * factor, 1),
+            carbsG: round(item.carbsG * factor, 1),
+            fatG: round(item.fatG * factor, 1),
+          })),
+        },
+        ctx.userId,
+      );
+
+      const after = await todaySnapshot(ctx);
+
+      return {
+        output: {
+          updated: true,
+          name: target.name,
+          calories_before: before,
+          calories_now: updated?.totalCalories ?? 0,
+          calories_eaten_today: after.calories_eaten,
+          calories_remaining: after.calories_remaining,
+        },
+        action: {
+          tool: "scale_meal",
+          summary: `${target.name}: ${Math.round(before)} → ${Math.round(
+            updated?.totalCalories ?? 0,
+          )} kcal`,
+          mutating: true,
+        },
+      };
+    },
+  },
+
+  {
+    spec: {
       name: "delete_meal",
       description:
         "Remove a meal logged today — for corrections like a double entry. " +
@@ -517,6 +611,12 @@ const TOOLS: JarvisTool[] = [
     },
   },
 ];
+
+/** Fixed decimal places, so a scaled figure doesn't arrive as 22.800000000000004. */
+function round(value: number, places: number): number {
+  const factor = 10 ** places;
+  return Math.round(value * factor) / factor;
+}
 
 const BY_NAME = new Map(TOOLS.map((tool) => [tool.spec.name, tool]));
 

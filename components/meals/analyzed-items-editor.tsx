@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,35 @@ interface Props {
 export function AnalyzedItemsEditor({ items, onChange }: Props) {
   function updateItem(index: number, patch: Partial<AnalyzedItem>) {
     onChange(items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+  }
+
+  /**
+   * Quantity drives the nutrition.
+   *
+   * Halving the portion has to halve the calories — otherwise "0.5" reads as a
+   * correction the numbers never received, which is worse than not offering the
+   * field. Scaling is relative to the quantity currently committed, so
+   * successive edits compose instead of compounding off the original.
+   *
+   * The nutrition fields stay directly editable: typing a calorie figure
+   * overrides the scaled one and does not touch the quantity.
+   */
+  function setQuantity(index: number, nextQuantity: number) {
+    const item = items[index];
+    // A committed quantity is never 0 (see QuantityField), so this is safe;
+    // the guard is for hand-constructed items.
+    const ratio = item.quantity > 0 ? nextQuantity / item.quantity : 1;
+
+    // One decimal, not whole calories. Editing "60" to "63" passes through
+    // "6", and rounding that intermediate to a whole number loses about 1% by
+    // the time it scales back up. A decimal round-trips exactly.
+    updateItem(index, {
+      quantity: nextQuantity,
+      calories: round1(item.calories * ratio),
+      proteinG: round1(item.proteinG * ratio),
+      carbsG: round1(item.carbsG * ratio),
+      fatG: round1(item.fatG * ratio),
+    });
   }
 
   function removeItem(index: number) {
@@ -91,12 +121,10 @@ export function AnalyzedItemsEditor({ items, onChange }: Props) {
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <NumberField
-              label="Qty"
+            <QuantityField
               value={item.quantity}
-              min={0.1}
-              step={0.1}
-              onChange={(quantity) => updateItem(index, { quantity })}
+              onCommit={(quantity) => setQuantity(index, quantity)}
+              label={`Item ${index + 1} quantity`}
             />
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Unit</Label>
@@ -150,6 +178,63 @@ export function AnalyzedItemsEditor({ items, onChange }: Props) {
           {round1(totals.fat)}g
         </span>
       </div>
+
+      <p className="text-center text-xs text-muted-foreground">
+        Changing the quantity rescales that row — set it to 0.5 if you only ate
+        half. Editing a calorie or macro figure leaves the quantity alone.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The quantity input, which rescales the row as it changes.
+ *
+ * It holds the typed text rather than a number, and only commits a value
+ * greater than zero. That matters because changing 1 to 0.5 passes through
+ * "0" — and a commit at zero would multiply the row's nutrition to nothing,
+ * with no quantity left to scale back from. Anything invalid or zero simply
+ * isn't committed, and the field snaps back on blur.
+ */
+function QuantityField({
+  value,
+  onCommit,
+  label,
+}: {
+  value: number;
+  onCommit: (value: number) => void;
+  label: string;
+}) {
+  const [draft, setDraft] = useState(() => String(value));
+  const [lastValue, setLastValue] = useState(value);
+
+  // Adjusting state during render rather than in an effect: this is the
+  // documented way to react to a prop change without a second render pass.
+  // The draft is left alone when it already represents `value`, so typing
+  // "0.50" isn't rewritten to "0.5" under the cursor.
+  if (value !== lastValue) {
+    setLastValue(value);
+    if (Number.parseFloat(draft) !== value) setDraft(String(value));
+  }
+
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs text-muted-foreground">Qty</Label>
+      <Input
+        type="number"
+        inputMode="decimal"
+        min={0}
+        step={0.1}
+        value={draft}
+        aria-label={label}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          const parsed = Number.parseFloat(event.target.value);
+          if (Number.isFinite(parsed) && parsed > 0) onCommit(parsed);
+        }}
+        onBlur={() => setDraft(String(value))}
+        className="h-8"
+      />
     </div>
   );
 }
