@@ -1,16 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAnalyzeMeal } from "@/hooks/use-meals";
 import type { AnalyzedItem } from "@/types/api";
 
 interface Props {
   items: AnalyzedItem[];
   onChange: (items: AnalyzedItem[]) => void;
+}
+
+/** What a row describes, phrased as the analyser expects to read it. */
+function describe(item: AnalyzedItem): string {
+  return `${item.quantity} ${item.unit} ${item.name}`.trim();
 }
 
 /**
@@ -21,8 +27,77 @@ interface Props {
  * corrections are reflected instantly; the server re-derives them on save.
  */
 export function AnalyzedItemsEditor({ items, onChange }: Props) {
+  const analyze = useAnalyzeMeal();
+  // Which row is being re-estimated, or "all". Tracked here rather than using
+  // the mutation's own pending flag, so only the affected row shows a spinner.
+  const [busy, setBusy] = useState<number | "all" | null>(null);
+
   function updateItem(index: number, patch: Partial<AnalyzedItem>) {
     onChange(items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+  }
+
+  /**
+   * Re-estimate one row from what it now says.
+   *
+   * Changing "chicken breast" to "salmon fillet" leaves the old calories in
+   * place, which is worse than an empty field — the numbers look considered but
+   * describe food that is no longer there.
+   *
+   * The name, quantity and unit the user typed are kept; only the nutrition is
+   * replaced. If the analyser splits the description into several foods their
+   * figures are summed back into the one row, so re-estimating never changes
+   * the shape of the list underneath you.
+   */
+  function reestimateRow(index: number) {
+    const item = items[index];
+    if (!item.name.trim() || busy !== null) return;
+
+    setBusy(index);
+    analyze.mutate(
+      { mode: "text", description: describe(item) },
+      {
+        onSuccess: (result) => {
+          const sum = result.items.reduce(
+            (acc, part) => ({
+              calories: acc.calories + part.calories,
+              proteinG: acc.proteinG + part.proteinG,
+              carbsG: acc.carbsG + part.carbsG,
+              fatG: acc.fatG + part.fatG,
+            }),
+            { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 },
+          );
+
+          updateItem(index, {
+            calories: round1(sum.calories),
+            proteinG: round1(sum.proteinG),
+            carbsG: round1(sum.carbsG),
+            fatG: round1(sum.fatG),
+          });
+        },
+        onSettled: () => setBusy(null),
+      },
+    );
+  }
+
+  /**
+   * Re-estimate the whole meal in one request.
+   *
+   * Cheaper than a row at a time — each analysis costs one request against the
+   * API quota — and the right choice when several foods changed. This one does
+   * replace the list, because re-reading the whole meal is the point.
+   */
+  function reestimateAll() {
+    const described = items.filter((item) => item.name.trim()).map(describe);
+    if (described.length === 0 || busy !== null) return;
+
+    setBusy("all");
+    analyze.mutate(
+      { mode: "text", description: described.join(", ") },
+      {
+        onSuccess: (result) => onChange(result.items),
+        onSettled: () => setBusy(null),
+      },
+    );
   }
 
   /**
@@ -101,7 +176,7 @@ export function AnalyzedItemsEditor({ items, onChange }: Props) {
     <div className="space-y-3">
       {items.map((item, index) => (
         <div key={index} className="rounded-xl border bg-card p-3 shadow-sm">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <Input
               value={item.name}
               onChange={(e) => updateItem(index, { name: e.target.value })}
@@ -112,7 +187,24 @@ export function AnalyzedItemsEditor({ items, onChange }: Props) {
               type="button"
               variant="ghost"
               size="icon"
+              className="shrink-0 text-muted-foreground hover:text-primary"
+              disabled={busy !== null || item.name.trim().length === 0}
+              onClick={() => reestimateRow(index)}
+              aria-label={`Re-estimate the nutrition for ${item.name || `item ${index + 1}`}`}
+              title="Changed this food? Re-estimate its calories."
+            >
+              {busy === index ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Sparkles className="size-4" />
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
               className="shrink-0 text-muted-foreground hover:text-destructive"
+              disabled={busy !== null}
               onClick={() => removeItem(index)}
               aria-label={`Remove ${item.name}`}
             >
@@ -158,16 +250,39 @@ export function AnalyzedItemsEditor({ items, onChange }: Props) {
         </div>
       ))}
 
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="w-full"
-        onClick={addItem}
-      >
-        <Plus className="mr-2 size-4" />
-        Add another item
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="flex-1"
+          disabled={busy !== null}
+          onClick={addItem}
+        >
+          <Plus className="mr-2 size-4" />
+          Add item
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="flex-1"
+          disabled={busy !== null || items.every((item) => !item.name.trim())}
+          onClick={reestimateAll}
+        >
+          {busy === "all" ? (
+            <>
+              <Loader2 className="mr-2 size-4 animate-spin" />
+              Re-estimating…
+            </>
+          ) : (
+            <>
+              <Sparkles className="mr-2 size-4" />
+              Re-estimate all
+            </>
+          )}
+        </Button>
+      </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-secondary/60 px-4 py-3 text-sm">
         <span className="font-semibold">
@@ -180,8 +295,10 @@ export function AnalyzedItemsEditor({ items, onChange }: Props) {
       </div>
 
       <p className="text-center text-xs text-muted-foreground">
-        Changing the quantity rescales that row — set it to 0.5 if you only ate
-        half. Editing a calorie or macro figure leaves the quantity alone.
+        Changed a food? Tap <Sparkles className="inline size-3" aria-hidden /> on
+        that row to re-estimate its calories, or{" "}
+        <span className="font-medium">Re-estimate all</span> if several changed.
+        Changing the quantity rescales that row on its own — no analysis needed.
       </p>
     </div>
   );
