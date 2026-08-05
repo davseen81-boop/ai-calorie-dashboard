@@ -22,7 +22,13 @@ import type {
  * refresh" rather than as an error.
  */
 export const queryKeys = {
-  today: ["dashboard", "today"] as const,
+  /**
+   * A null date means today. Every entry is prefix-matched by
+   * `["dashboard", "today"]`, so one invalidation still clears whichever days
+   * happen to be cached.
+   */
+  today: (date?: string | null) =>
+    ["dashboard", "today", date ?? "current"] as const,
   weekly: (days: number) => ["dashboard", "weekly", days] as const,
   meals: (filters: MealFilters) => ["meals", filters] as const,
   profile: ["profile"] as const,
@@ -45,10 +51,14 @@ function invalidateMealData(queryClient: ReturnType<typeof useQueryClient>) {
 // Reads
 // ---------------------------------------------------------------------------
 
-export function useTodaySummary() {
+/** @param date local `yyyy-MM-dd`, or null/undefined for today. */
+export function useTodaySummary(date?: string | null) {
   return useQuery({
-    queryKey: queryKeys.today,
-    queryFn: () => api.get<TodaySummary>("/api/dashboard/today"),
+    queryKey: queryKeys.today(date),
+    queryFn: () =>
+      api.get<TodaySummary>(
+        date ? `/api/dashboard/today?date=${date}` : "/api/dashboard/today",
+      ),
   });
 }
 
@@ -183,8 +193,9 @@ export function useDeleteMeal() {
         meals: queryClient.getQueriesData({ queryKey: ["meals"] }),
       };
 
+      // Prefix match: the deleted meal may be showing on any cached day.
       queryClient.setQueriesData<TodaySummary>(
-        { queryKey: queryKeys.today },
+        { queryKey: ["dashboard", "today"] },
         (old) =>
           old
             ? { ...old, meals: old.meals.filter((meal) => meal.id !== id) }

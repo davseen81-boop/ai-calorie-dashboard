@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
-import { Loader2 } from "lucide-react";
+import { Camera, Image as ImageIcon, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -24,7 +25,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MEAL_TYPES } from "@/lib/db/schema";
-import { useProfile, useUpdateMeal } from "@/hooks/use-meals";
+import { useAnalyzeMeal, useProfile, useUpdateMeal } from "@/hooks/use-meals";
+import { ImageProcessingError, prepareImageForUpload } from "@/lib/images";
 import type { AnalyzedItem, ApiMeal, MealType } from "@/types/api";
 import { AnalyzedItemsEditor } from "./analyzed-items-editor";
 
@@ -45,7 +47,12 @@ export function EditMealDialog({ meal, onClose }: Props) {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [items, setItems] = useState<AnalyzedItem[]>([]);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const update = useUpdateMeal();
+  const analyze = useAnalyzeMeal();
+
+  const libraryInput = useRef<HTMLInputElement>(null);
+  const cameraInput = useRef<HTMLInputElement>(null);
 
   // The profile's zone, not the device's. A meal belongs to the day the user
   // experienced, and every other surface — the dashboard, the reports — buckets
@@ -76,6 +83,40 @@ export function EditMealDialog({ meal, onClose }: Props) {
       })),
     );
   }, [meal, zone]);
+
+  /**
+   * Replace the meal's foods from a new photo.
+   *
+   * The image is compressed in the browser first — a phone photo is far too
+   * large to POST, and this also re-encodes HEIC and fixes EXIF rotation. The
+   * name is only overwritten if the user has not renamed the meal themselves.
+   */
+  async function analysePhoto(file: File) {
+    setPhotoBusy(true);
+    try {
+      const prepared = await prepareImageForUpload(file);
+      analyze.mutate(
+        { mode: "photo", image: prepared.dataUrl },
+        {
+          onSuccess: (result) => {
+            setItems(result.items);
+            if (meal && name.trim() === meal.name) setName(result.name);
+            toast.success("Re-read from the photo", {
+              description: `${result.items.length} food${result.items.length === 1 ? "" : "s"} — check them before saving.`,
+            });
+          },
+          onSettled: () => setPhotoBusy(false),
+        },
+      );
+    } catch (error) {
+      setPhotoBusy(false);
+      toast.error(
+        error instanceof ImageProcessingError
+          ? error.message
+          : "Could not read that image.",
+      );
+    }
+  }
 
   function handleSave() {
     if (!meal) return;
@@ -160,6 +201,65 @@ export function EditMealDialog({ meal, onClose }: Props) {
                 onChange={(e) => setTime(e.target.value)}
               />
             </div>
+          </div>
+
+          {/* Photos are analysed and discarded, never stored, so there is no
+              existing image to show — this replaces the estimate from a new
+              one rather than editing the old picture. */}
+          <input
+            ref={libraryInput}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void analysePhoto(file);
+              e.target.value = "";
+            }}
+          />
+          <input
+            ref={cameraInput}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void analysePhoto(file);
+              e.target.value = "";
+            }}
+          />
+
+          <div className="space-y-2">
+            <Label>Got a photo of it?</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={photoBusy}
+                onClick={() => libraryInput.current?.click()}
+              >
+                {photoBusy ? (
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                ) : (
+                  <ImageIcon className="mr-2 size-4" />
+                )}
+                Choose photo
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={photoBusy}
+                onClick={() => cameraInput.current?.click()}
+              >
+                <Camera className="mr-2 size-4" />
+                Take photo
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Re-reads the meal from the picture and replaces the foods below.
+              The photo itself is never stored.
+            </p>
           </div>
 
           {movedDay && (

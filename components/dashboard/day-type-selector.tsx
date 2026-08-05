@@ -33,7 +33,14 @@ const OPTIONS: Array<{
  * number turns a guess into a comparison. The tiles stay large — this is the
  * one control here pressed with a thumb, often mid-cooking.
  */
-export function DayTypeSelector({ summary }: { summary: TodaySummary }) {
+export function DayTypeSelector({
+  summary,
+  isToday = true,
+}: {
+  summary: TodaySummary;
+  /** False when an earlier day is on screen, so the copy stops saying "today". */
+  isToday?: boolean;
+}) {
   const queryClient = useQueryClient();
 
   const setDay = useMutation({
@@ -59,7 +66,9 @@ export function DayTypeSelector({ summary }: { summary: TodaySummary }) {
     <Card>
       <CardContent className="space-y-3 p-4">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-medium">Today is a…</p>
+          <p className="text-sm font-medium">
+            {isToday ? "Today" : "That day"} is a…
+          </p>
           {fromPlan && (
             <span className="text-xs text-muted-foreground">
               from your weekly plan
@@ -103,8 +112,8 @@ export function DayTypeSelector({ summary }: { summary: TodaySummary }) {
 
         <p className="text-xs text-muted-foreground">
           {summary.exercise.caloriesBurned > 0 && summary.exercise.adjustsTarget
-            ? `${summary.goals.calories.toLocaleString()} kcal today, including what you've logged as training. `
-            : `${summary.day.baseCalories.toLocaleString()} kcal today. `}
+            ? `${summary.goals.calories.toLocaleString()} kcal, including what was logged as training. `
+            : `${summary.day.baseCalories.toLocaleString()} kcal. `}
           Macros scale with it. Normal is your plain daily goal, for tracking
           against one steady number.
         </p>

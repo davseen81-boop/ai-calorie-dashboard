@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useApplyRoutine, useRoutines, useUpdateRoutine } from "@/hooks/use-routines";
+import { useProfile } from "@/hooks/use-meals";
+import { useViewedDate } from "@/components/providers/viewed-date";
+import { instantOnLocalDate } from "@/lib/date";
 import type { ApiRoutine } from "@/types/api";
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -19,7 +22,14 @@ const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
  */
 export function RepeatPicker({ onLogged }: { onLogged: () => void }) {
   const routines = useRoutines();
-  const apply = useApplyRoutine();
+  // Applying while looking at an earlier day lands on that day.
+  const { date: viewedDate } = useViewedDate();
+  const profile = useProfile();
+  const apply = useApplyRoutine(
+    viewedDate
+      ? instantOnLocalDate(viewedDate, profile.data?.timezone ?? "UTC")
+      : null,
+  );
   const update = useUpdateRoutine();
 
   // Also show the skeleton while revalidating an empty cache: reopening the

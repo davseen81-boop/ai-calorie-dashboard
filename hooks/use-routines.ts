@@ -98,21 +98,28 @@ export function useDeleteRoutine() {
   });
 }
 
-/** Log a routine's meals right now. */
-export function useApplyRoutine() {
+/**
+ * Log a routine's meals.
+ *
+ * `at` anchors the local day, so applying a routine while looking back at
+ * yesterday lands on yesterday rather than silently on today. The route already
+ * accepted it; only the caller is new.
+ */
+export function useApplyRoutine(at?: Date | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
       api.post<{ routine: ApiRoutine; mealCount: number }>(
         `/api/routines/${id}/apply`,
-        {},
+        at ? { at: at.toISOString() } : {},
       ),
     onSuccess: ({ routine, mealCount }) => {
+      const where = at ? "that day" : "today";
       toast.success(`${routine.name} logged`, {
         description:
           mealCount === 1
-            ? "Added to today."
-            : `${mealCount} meals added to today.`,
+            ? `Added to ${where}.`
+            : `${mealCount} meals added to ${where}.`,
       });
       invalidateAll(queryClient);
     },

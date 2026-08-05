@@ -35,7 +35,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { MEAL_TYPES } from "@/lib/db/schema";
-import { useAnalyzeMeal, useSaveMeal } from "@/hooks/use-meals";
+import { useAnalyzeMeal, useProfile, useSaveMeal } from "@/hooks/use-meals";
+import { useViewedDate } from "@/components/providers/viewed-date";
+import { instantOnLocalDate } from "@/lib/date";
 import type { AnalyzedItem, AnalyzeResponse, MealType } from "@/types/api";
 import {
   ImageProcessingError,
@@ -100,6 +102,10 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
   const [mealName, setMealName] = useState("");
   const [mealType, setMealType] = useState<MealType>("snack");
   const [source, setSource] = useState<"text" | "photo" | "manual">("text");
+
+  const { date: viewedDate } = useViewedDate();
+  const profile = useProfile();
+  const timezone = profile.data?.timezone ?? "UTC";
 
   // Separate refs because the two inputs differ by the `capture` attribute,
   // which cannot be toggled per click — see the inputs below.
@@ -173,11 +179,18 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
   }
 
   function handleSave() {
+    // Files against the day the dashboard is showing, keeping the current
+    // time-of-day. Omitted for today so the server stamps the real instant.
+    const loggedAt = viewedDate
+      ? instantOnLocalDate(viewedDate, timezone).toISOString()
+      : undefined;
+
     save.mutate(
       {
         name: mealName.trim(),
         mealType,
         source,
+        ...(loggedAt ? { loggedAt } : {}),
         rawInput:
           source === "text"
             ? description.trim()

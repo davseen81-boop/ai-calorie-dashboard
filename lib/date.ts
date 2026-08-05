@@ -80,6 +80,23 @@ export function localDateString(
   return format(toZonedTime(at, zone), "yyyy-MM-dd");
 }
 
+/**
+ * The instant matching `reference`'s local time-of-day, on a different date.
+ *
+ * Used when logging against a day other than today: food added at 8pm while
+ * looking at yesterday lands at 8pm yesterday, rather than midnight or noon.
+ * Keeping the time-of-day means the meal sorts sensibly in that day's timeline.
+ */
+export function instantOnLocalDate(
+  date: string,
+  timeZone: string,
+  reference: Date = new Date(),
+): Date {
+  const zone = isValidTimeZone(timeZone) ? timeZone : "UTC";
+  const time = format(toZonedTime(reference, zone), "HH:mm:ss");
+  return fromZonedTime(`${date}T${time}`, zone);
+}
+
 /** `HH:mm` in the user's zone — passed to the model to infer meal type. */
 export function localTimeLabel(
   timeZone: string,

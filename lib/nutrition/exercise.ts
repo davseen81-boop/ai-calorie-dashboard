@@ -117,12 +117,25 @@ export function buildAdvice(input: {
   const remaining = Math.round(adjustedGoal - consumed);
   const earned = Math.round(exerciseBurned);
 
+  /**
+   * A finished day has nothing "left" — that word invites eating calories that
+   * are no longer available. Reviewing an earlier day should read as a record,
+   * not an allowance.
+   */
+  const dayIsOver = input.hoursLeftInDay <= 0.05;
+  const shortfall = dayIsOver ? "under target" : "left";
+
   if (consumed === 0) {
     return {
       tone: "under",
-      headline: earned > 0 ? `${adjustedGoal} kcal to play with` : "Nothing logged yet",
-      detail:
-        earned > 0
+      headline: dayIsOver
+        ? "Nothing logged"
+        : earned > 0
+          ? `${adjustedGoal} kcal to play with`
+          : "Nothing logged yet",
+      detail: dayIsOver
+        ? "No meals were recorded on this day."
+        : earned > 0
           ? `Your ${baseGoal} target plus ${earned} earned from exercise.`
           : "Log a meal to see how the day is tracking.",
     };
@@ -152,7 +165,7 @@ export function buildAdvice(input: {
   if (input.hoursLeftInDay <= 4 && remaining > 0.35 * adjustedGoal) {
     return {
       tone: "under",
-      headline: `${remaining} kcal left`,
+      headline: `${remaining} kcal ${shortfall}`,
       detail:
         earned > 0
           ? `You trained today, which raised the target by ${earned}. Eating well under it regularly is worth a word with a doctor or dietitian.`
@@ -162,9 +175,10 @@ export function buildAdvice(input: {
 
   return {
     tone: "on_track",
-    headline: `${remaining} kcal left`,
-    detail:
-      earned > 0
+    headline: `${remaining} kcal ${shortfall}`,
+    detail: dayIsOver
+      ? "Close enough to target for the day to count."
+      : earned > 0
         ? `Includes ${earned} earned from today's exercise.`
         : "On track for your target.",
   };
