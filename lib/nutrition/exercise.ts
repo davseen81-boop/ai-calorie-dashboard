@@ -24,6 +24,13 @@ export const ACTIVITIES: ActivityOption[] = [
   // Walking and running
   { key: "walk_slow", label: "Walking, slow", group: "Walking & running", met: 2.8 },
   { key: "walk_brisk", label: "Walking, brisk", group: "Walking & running", met: 4.3 },
+  /**
+   * Zone 2 is a heart-rate zone, not a speed, so there is no single Compendium
+   * entry for it. Walking hard enough to hold roughly 60–70% of maximum heart
+   * rate lands near 4 mph on the flat or a gentler pace uphill — both about 5
+   * METs, and sensibly between a brisk walk and a hike.
+   */
+  { key: "walk_zone2", label: "Walking, zone 2", group: "Walking & running", met: 5.0 },
   { key: "hiking", label: "Hiking", group: "Walking & running", met: 6.0 },
   { key: "stairs", label: "Stair climbing", group: "Walking & running", met: 8.8 },
   { key: "run_easy", label: "Running, easy (8 km/h)", group: "Walking & running", met: 8.3 },
@@ -51,6 +58,13 @@ export const ACTIVITIES: ActivityOption[] = [
   { key: "badminton", label: "Badminton", group: "Sport", met: 5.5 },
   { key: "tennis", label: "Tennis", group: "Sport", met: 7.3 },
   { key: "martial_arts", label: "Martial arts", group: "Sport", met: 10.3 },
+  /**
+   * Deliberately the same value as martial arts above — the Compendium groups
+   * kickboxing with judo, karate and taekwondo, and inventing a different
+   * figure would imply a precision that does not exist. It is listed separately
+   * because people look for their sport by name, not by category.
+   */
+  { key: "muay_thai", label: "Muay Thai", group: "Sport", met: 10.3 },
   { key: "climbing", label: "Climbing", group: "Sport", met: 7.5 },
 
   // Lower intensity
