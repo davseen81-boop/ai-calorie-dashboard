@@ -104,11 +104,29 @@ const aiEnvSchema = z.object({
   // works without a paid plan.
   GEMINI_API_KEY: z.string().min(1).optional(),
   /**
+   * Meal analysis: photos and written descriptions. Low volume, one request
+   * per meal, and the one place estimate quality is most visible — so this
+   * should stay on a capable model.
+   *
    * Google retires models for *new* accounts while keeping them listed for
    * existing ones, so an older default silently 404s only for newer users.
    * Keep this on a current model.
    */
   GEMINI_MODEL: z.string().min(1).default("gemini-3.6-flash"),
+
+  /**
+   * Jarvis. Deliberately a *different* model from the one above.
+   *
+   * Google's quotas are per project **per model**, so the two workloads on one
+   * model share a single daily allowance — and a chat, which spends one request
+   * per tool call plus one to reply, will starve meal analysis long before the
+   * day is out. Splitting them gives each its own bucket for free.
+   *
+   * A lite model is the right fit here: conversation is high volume and low
+   * stakes, and it handles the multi-step tool chains Jarvis needs. Set this
+   * equal to GEMINI_MODEL if you would rather have one model for everything.
+   */
+  GEMINI_CHAT_MODEL: z.string().min(1).default("gemini-3.5-flash-lite"),
 
   // Retained so the provider can be switched back with one env var.
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
@@ -121,6 +139,7 @@ export const aiEnv = lazyEnv(
     AI_PROVIDER: emptyToUndefined(process.env.AI_PROVIDER),
     GEMINI_API_KEY: emptyToUndefined(process.env.GEMINI_API_KEY),
     GEMINI_MODEL: emptyToUndefined(process.env.GEMINI_MODEL),
+    GEMINI_CHAT_MODEL: emptyToUndefined(process.env.GEMINI_CHAT_MODEL),
     ANTHROPIC_API_KEY: emptyToUndefined(process.env.ANTHROPIC_API_KEY),
     ANTHROPIC_MODEL: emptyToUndefined(process.env.ANTHROPIC_MODEL),
   }),

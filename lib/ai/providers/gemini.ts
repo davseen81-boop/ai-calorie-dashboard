@@ -96,7 +96,11 @@ export const callGemini: ProviderCall = async ({ system, text, image }) => {
  * status. Shared with the Jarvis chat provider so both surfaces explain a dead
  * key, an exhausted quota and a retired model the same way.
  */
-export function mapGeminiError(error: unknown, model: string): AiAnalysisError {
+export function mapGeminiError(
+  error: unknown,
+  model: string,
+  envVar = "GEMINI_MODEL",
+): AiAnalysisError {
   if (error instanceof AiAnalysisError) return error;
 
   const message = error instanceof Error ? error.message : String(error);
@@ -120,12 +124,12 @@ export function mapGeminiError(error: unknown, model: string): AiAnalysisError {
   return new AiAnalysisError(
     dailyQuota
       ? `Today's free Gemini allowance for "${model}" is used up. It resets at ` +
-        `midnight Pacific time — or switch GEMINI_MODEL to a model with a larger ` +
+        `midnight Pacific time — or switch ${envVar} to a model with a larger ` +
         `free tier, or enable billing on the key.`
       : rateLimited
         ? "Gemini's rate limit was hit. Wait a minute and try again."
         : badModel
-          ? `Gemini rejected the model "${model}". Set GEMINI_MODEL to one your account can use.`
+          ? `Gemini rejected the model "${model}". Set ${envVar} to one your account can use.`
           : overloaded
             ? "Gemini is busy right now. Give it a moment and try again."
             : "Could not reach Gemini.",

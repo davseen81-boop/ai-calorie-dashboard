@@ -41,6 +41,11 @@ and needs no card: [aistudio.google.com/apikey](https://aistudio.google.com/apik
 
 ### Switching AI provider
 
+Gemini quotas are per project **per model**, so meal analysis and Jarvis run
+on deliberately different ones — `GEMINI_MODEL` and `GEMINI_CHAT_MODEL`. Two
+models means two daily allowances, and a long chat can no longer eat the
+quota meal analysis needs. Set them equal if you would rather have one.
+
 Set `AI_PROVIDER` to `gemini` (default) or `anthropic`; only that provider's
 key is required. Prompts, schema validation and error handling are shared, so
 switching is one env var rather than a code change.

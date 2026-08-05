@@ -84,7 +84,7 @@ export const callGeminiChat: ChatProviderCall = async ({ system, turns, tools })
     );
   }
 
-  const model = aiEnv.GEMINI_MODEL;
+  const model = aiEnv.GEMINI_CHAT_MODEL;
   client ??= new GoogleGenAI({ apiKey });
 
   try {
@@ -144,6 +144,6 @@ export const callGeminiChat: ChatProviderCall = async ({ system, turns, tools })
       ...(content ? { raw: { provider: "gemini" as const, content } } : {}),
     };
   } catch (error) {
-    throw mapGeminiError(error, model);
+    throw mapGeminiError(error, model, "GEMINI_CHAT_MODEL");
   }
 };
