@@ -25,10 +25,11 @@ import { MealTimeline } from "@/components/meals/meal-timeline";
 import { PeriodReportView } from "@/components/reports/period-report";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { useMeals } from "@/hooks/use-meals";
+import { useMeals, useProfile } from "@/hooks/use-meals";
 import { MEAL_TYPES } from "@/lib/db/schema";
 import type { ApiMeal, MealType } from "@/types/api";
 import { cn } from "@/lib/utils";
+import { localDateString } from "@/lib/date";
 
 const ALL = "all";
 
@@ -56,6 +57,8 @@ export default function HistoryPage() {
   }, [debouncedSearch, mealType, date]);
 
   const meals = useMeals(filters);
+  const profile = useProfile();
+  const zone = profile.data?.timezone ?? "UTC";
   const hasFilters = Boolean(search || mealType !== ALL || date);
 
   return (
@@ -155,7 +158,7 @@ export default function HistoryPage() {
           ) : meals.data.meals.length === 0 ? (
             <EmptyState hasFilters={hasFilters} />
           ) : (
-            <GroupedMeals meals={meals.data.meals} />
+            <GroupedMeals meals={meals.data.meals} zone={zone} />
           )}
         </TabsContent>
       </Tabs>
@@ -164,17 +167,17 @@ export default function HistoryPage() {
 }
 
 /** Groups the flat, newest-first list into day sections. */
-function GroupedMeals({ meals }: { meals: ApiMeal[] }) {
+function GroupedMeals({ meals, zone }: { meals: ApiMeal[]; zone: string }) {
   const groups = useMemo(() => {
     const byDay = new Map<string, ApiMeal[]>();
     for (const meal of meals) {
-      const key = format(parseISO(meal.loggedAt), "yyyy-MM-dd");
+      const key = localDateString(parseISO(meal.loggedAt), zone);
       const bucket = byDay.get(key);
       if (bucket) bucket.push(meal);
       else byDay.set(key, [meal]);
     }
     return Array.from(byDay.entries());
-  }, [meals]);
+  }, [meals, zone]);
 
   return (
     <div className="space-y-6">

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { format, parseISO } from "date-fns";
+import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -22,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MEAL_TYPES } from "@/lib/db/schema";
-import { useUpdateMeal } from "@/hooks/use-meals";
+import { useProfile, useUpdateMeal } from "@/hooks/use-meals";
 import type { AnalyzedItem, ApiMeal, MealType } from "@/types/api";
 import { AnalyzedItemsEditor } from "./analyzed-items-editor";
 
@@ -40,14 +42,28 @@ interface Props {
 export function EditMealDialog({ meal, onClose }: Props) {
   const [name, setName] = useState("");
   const [mealType, setMealType] = useState<MealType>("snack");
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
   const [items, setItems] = useState<AnalyzedItem[]>([]);
   const update = useUpdateMeal();
+
+  // The profile's zone, not the device's. A meal belongs to the day the user
+  // experienced, and every other surface — the dashboard, the reports — buckets
+  // it that way; editing in device time would move meals between days for
+  // anyone travelling.
+  const profile = useProfile();
+  const zone = profile.data?.timezone ?? "UTC";
 
   // Re-seed the form whenever a different meal is opened.
   useEffect(() => {
     if (!meal) return;
     setName(meal.name);
     setMealType(meal.mealType);
+
+    const local = toZonedTime(parseISO(meal.loggedAt), zone);
+    setDate(format(local, "yyyy-MM-dd"));
+    setTime(format(local, "HH:mm"));
+
     setItems(
       meal.items.map((item) => ({
         name: item.name,
@@ -59,15 +75,30 @@ export function EditMealDialog({ meal, onClose }: Props) {
         fatG: item.fatG,
       })),
     );
-  }, [meal]);
+  }, [meal, zone]);
 
   function handleSave() {
     if (!meal) return;
+
+    // Only sent when both parts parse. A half-typed date would otherwise move
+    // the meal to an arbitrary instant, which is worse than leaving it alone.
+    const when =
+      date && time ? fromZonedTime(`${date}T${time}`, zone) : null;
+    const loggedAt =
+      when && !Number.isNaN(when.getTime()) ? when.toISOString() : undefined;
+
     update.mutate(
-      { id: meal.id, name: name.trim(), mealType, items },
+      { id: meal.id, name: name.trim(), mealType, items, ...(loggedAt ? { loggedAt } : {}) },
       { onSuccess: onClose },
     );
   }
+
+  // Moving a meal across midnight changes which day's totals it counts toward,
+  // so it is worth saying rather than leaving them to notice.
+  const movedDay =
+    meal && date
+      ? format(toZonedTime(parseISO(meal.loggedAt), zone), "yyyy-MM-dd") !== date
+      : false;
 
   return (
     <Dialog open={meal !== null} onOpenChange={(open) => !open && onClose()}>
@@ -75,7 +106,8 @@ export function EditMealDialog({ meal, onClose }: Props) {
         <DialogHeader>
           <DialogTitle>Edit meal</DialogTitle>
           <DialogDescription>
-            Correct the name, meal type, or any of the nutrition figures.
+            Correct the name, meal type, when you ate it, or any of the
+            nutrition figures.
           </DialogDescription>
         </DialogHeader>
 
@@ -108,6 +140,34 @@ export function EditMealDialog({ meal, onClose }: Props) {
               </Select>
             </div>
           </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="edit-date">Date</Label>
+              <Input
+                id="edit-date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-time">Time</Label>
+              <Input
+                id="edit-time"
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {movedDay && (
+            <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
+              This moves the meal to a different day, so both days&apos; totals
+              will change.
+            </p>
+          )}
 
           <AnalyzedItemsEditor items={items} onChange={setItems} />
         </div>

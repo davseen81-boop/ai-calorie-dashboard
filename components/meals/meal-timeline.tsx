@@ -38,6 +38,7 @@ const MEAL_TYPE_STYLES: Record<string, string> = {
   breakfast: "bg-warning/10 text-warning border-warning/20",
   lunch: "bg-carbs/10 text-carbs border-carbs/20",
   dinner: "bg-primary/10 text-primary border-primary/20",
+  supper: "bg-protein/10 text-protein border-protein/20",
   snack: "bg-muted text-muted-foreground",
 };
 
