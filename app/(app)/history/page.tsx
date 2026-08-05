@@ -166,6 +166,89 @@ export default function HistoryPage() {
   );
 }
 
+/**
+ * A day's heading: the date, its calories, and where they came from.
+ *
+ * The bar is split by **energy**, not by grams — 10g of fat and 10g of carbs
+ * are equal by weight but contribute very differently, so a gram-weighted bar
+ * would misrepresent the day. The labels stay in grams, because that is what
+ * the targets are set in.
+ */
+function DayHeading({ day, meals }: { day: string; meals: ApiMeal[] }) {
+  const totals = meals.reduce(
+    (acc, meal) => ({
+      calories: acc.calories + meal.totalCalories,
+      protein: acc.protein + meal.totalProteinG,
+      carbs: acc.carbs + meal.totalCarbsG,
+      fat: acc.fat + meal.totalFatG,
+    }),
+    { calories: 0, protein: 0, carbs: 0, fat: 0 },
+  );
+
+  const energy = {
+    protein: totals.protein * 4,
+    carbs: totals.carbs * 4,
+    fat: totals.fat * 9,
+  };
+  const fromMacros = energy.protein + energy.carbs + energy.fat;
+
+  const share = (value: number) =>
+    fromMacros > 0 ? (value / fromMacros) * 100 : 0;
+
+  const parts = [
+    { key: "protein", label: "P", grams: totals.protein, width: share(energy.protein), colour: "bg-arc-blue" },
+    { key: "carbs", label: "C", grams: totals.carbs, width: share(energy.carbs), colour: "bg-arc-orange" },
+    { key: "fat", label: "F", grams: totals.fat, width: share(energy.fat), colour: "bg-arc-yellow" },
+  ];
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="text-sm font-semibold text-muted-foreground">
+          {format(parseISO(day), "EEEE d MMMM")}
+        </h2>
+        <span className="shrink-0 text-sm font-medium tabular-nums">
+          {Math.round(totals.calories).toLocaleString()} kcal
+        </span>
+      </div>
+
+      {fromMacros > 0 && (
+        <>
+          <div className="flex h-1.5 overflow-hidden rounded-full bg-foreground/[0.07]">
+            {parts.map((part) => (
+              <div
+                key={part.key}
+                className={part.colour}
+                style={{ width: `${part.width}%` }}
+              />
+            ))}
+          </div>
+          <div className="flex gap-3 text-xs text-muted-foreground">
+            {parts.map((part) => (
+              <span key={part.key} className="flex items-center gap-1.5">
+                <span
+                  className={cn("size-2 shrink-0 rounded-full", part.colour)}
+                  aria-hidden
+                />
+                <span className="tabular-nums">
+                  {part.label} {round1(part.grams)}g
+                </span>
+                <span className="tabular-nums opacity-70">
+                  {Math.round(part.width)}%
+                </span>
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
 /** Groups the flat, newest-first list into day sections. */
 function GroupedMeals({ meals, zone }: { meals: ApiMeal[]; zone: string }) {
   const groups = useMemo(() => {
@@ -181,22 +264,12 @@ function GroupedMeals({ meals, zone }: { meals: ApiMeal[]; zone: string }) {
 
   return (
     <div className="space-y-6">
-      {groups.map(([day, dayMeals]) => {
-        const total = dayMeals.reduce((sum, m) => sum + m.totalCalories, 0);
-        return (
-          <section key={day} className="space-y-3">
-            <div className="flex items-baseline justify-between">
-              <h2 className="text-sm font-semibold text-muted-foreground">
-                {format(parseISO(day), "EEEE d MMMM")}
-              </h2>
-              <span className="text-sm tabular-nums text-muted-foreground">
-                {Math.round(total).toLocaleString()} kcal
-              </span>
-            </div>
-            <MealTimeline meals={dayMeals} />
-          </section>
-        );
-      })}
+      {groups.map(([day, dayMeals]) => (
+        <section key={day} className="space-y-3">
+          <DayHeading day={day} meals={dayMeals} />
+          <MealTimeline meals={dayMeals} />
+        </section>
+      ))}
     </div>
   );
 }

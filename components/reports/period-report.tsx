@@ -240,7 +240,13 @@ function DayBars({ days }: { days: PeriodReport["days"] }) {
           <div
             key={day.date}
             className="flex min-w-5 flex-1 flex-col items-center gap-1"
-            title={`${format(parseISO(day.date), "EEE d MMM")} — ${Math.round(day.consumed)} of ${day.target} kcal (${day.dayType})`}
+            title={
+              `${format(parseISO(day.date), "EEE d MMM")} — ` +
+              `${Math.round(day.consumed)} of ${day.target} kcal (${day.dayType})` +
+              (day.mealCount > 0
+                ? `\nP ${day.proteinG}g · C ${day.carbsG}g · F ${day.fatG}g`
+                : "\nNothing logged")
+            }
           >
             <div className="relative w-full" style={{ height: CHART_HEIGHT }}>
               <div
