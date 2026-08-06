@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NumberInput } from "@/components/ui/number-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -179,17 +180,13 @@ export function TrainingPlanCard({
                   <Label htmlFor="session-minutes" className="text-xs text-muted-foreground">
                     Minutes
                   </Label>
-                  <Input
+                  <NumberInput
                     id="session-minutes"
-                    type="number"
-                    inputMode="numeric"
-                    min={5}
+                    value={minutes === 0 ? null : minutes}
+                    onChange={setMinutes}
+                    emptyValue={0}
                     max={600}
-                    value={minutes}
-                    onChange={(e) => {
-                      const parsed = Number.parseInt(e.target.value, 10);
-                      setMinutes(Number.isFinite(parsed) ? parsed : 0);
-                    }}
+                    placeholder="45"
                   />
                 </div>
               </div>

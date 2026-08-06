@@ -6,6 +6,7 @@ import { Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NumberInput } from "@/components/ui/number-input";
 import { useAnalyzeMeal } from "@/hooks/use-meals";
 import type { AnalyzedItem } from "@/types/api";
 
@@ -372,18 +373,16 @@ function NumberField({
   return (
     <div className="space-y-1">
       <Label className="text-xs text-muted-foreground">{label}</Label>
-      <Input
-        type="number"
-        inputMode="decimal"
+      {/* Zero shows as an empty field with a greyed "0" hint rather than a
+          literal 0 to delete — a manual entry starts with four of these, and
+          clearing each one before typing is most of the work. */}
+      <NumberInput
+        value={value === 0 ? null : value}
+        onChange={onChange}
+        emptyValue={0}
         min={min}
         step={step}
-        value={value}
-        onChange={(e) => {
-          // An empty or half-typed field parses to NaN, which would render as
-          // a blank controlled input and lose the user's place. Clamp to 0.
-          const parsed = Number.parseFloat(e.target.value);
-          onChange(Number.isFinite(parsed) ? Math.max(min === 0 ? 0 : 0, parsed) : 0);
-        }}
+        aria-label={label}
         className="h-8"
       />
     </div>
