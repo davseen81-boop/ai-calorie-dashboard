@@ -27,6 +27,7 @@ import {
 import { MEAL_TYPES } from "@/lib/db/schema";
 import { useAnalyzeMeal, useProfile, useUpdateMeal } from "@/hooks/use-meals";
 import { ImageProcessingError, prepareImageForUpload } from "@/lib/images";
+import { MAX_PHOTOS } from "@/lib/validation/meals";
 import type { AnalyzedItem, ApiMeal, MealType } from "@/types/api";
 import { AnalyzedItemsEditor } from "./analyzed-items-editor";
 
@@ -91,19 +92,28 @@ export function EditMealDialog({ meal, onClose }: Props) {
    * large to POST, and this also re-encodes HEIC and fixes EXIF rotation. The
    * name is only overwritten if the user has not renamed the meal themselves.
    */
-  async function analysePhoto(file: File) {
+  async function analysePhotos(files: File[]) {
+    if (files.length === 0) return;
     setPhotoBusy(true);
     try {
-      const prepared = await prepareImageForUpload(file);
+      const prepared: string[] = [];
+      for (const file of files.slice(0, MAX_PHOTOS)) {
+        prepared.push((await prepareImageForUpload(file)).dataUrl);
+      }
       analyze.mutate(
-        { mode: "photo", image: prepared.dataUrl },
+        { mode: "photo", images: prepared },
         {
           onSuccess: (result) => {
             setItems(result.items);
             if (meal && name.trim() === meal.name) setName(result.name);
-            toast.success("Re-read from the photo", {
-              description: `${result.items.length} food${result.items.length === 1 ? "" : "s"} — check them before saving.`,
-            });
+            toast.success(
+              prepared.length > 1
+                ? `Re-read from ${prepared.length} photos`
+                : "Re-read from the photo",
+              {
+                description: `${result.items.length} food${result.items.length === 1 ? "" : "s"} — check them before saving.`,
+              },
+            );
           },
           onSettled: () => setPhotoBusy(false),
         },
@@ -210,10 +220,11 @@ export function EditMealDialog({ meal, onClose }: Props) {
             ref={libraryInput}
             type="file"
             accept="image/*"
+            multiple
             className="hidden"
             onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void analysePhoto(file);
+              const files = Array.from(e.target.files ?? []);
+              if (files.length) void analysePhotos(files);
               e.target.value = "";
             }}
           />
@@ -225,7 +236,7 @@ export function EditMealDialog({ meal, onClose }: Props) {
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file) void analysePhoto(file);
+              if (file) void analysePhotos([file]);
               e.target.value = "";
             }}
           />
@@ -244,7 +255,7 @@ export function EditMealDialog({ meal, onClose }: Props) {
                 ) : (
                   <ImageIcon className="mr-2 size-4" />
                 )}
-                Choose photo
+                Choose photos
               </Button>
               <Button
                 type="button"
@@ -257,8 +268,9 @@ export function EditMealDialog({ meal, onClose }: Props) {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Re-reads the meal from the picture and replaces the foods below.
-              The photo itself is never stored.
+              Re-reads the meal from the pictures and replaces the foods below.
+              Up to {MAX_PHOTOS} of the same meal — another angle, or the packet.
+              The photos themselves are never stored.
             </p>
           </div>
 

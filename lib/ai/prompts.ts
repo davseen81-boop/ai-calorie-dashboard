@@ -53,7 +53,15 @@ food.`;
 
 export const VISION_ANALYSIS_PROMPT = `${BASE_RULES}
 
-You are working from a photograph. Additionally:
+You are working from one or more photographs. Additionally:
+- SEVERAL PHOTOS SHOW THE SAME MEAL — a second angle, a close-up, or the packet
+  or menu beside it. Return ONE combined list. Never enter the same food twice
+  because it appears in more than one photo; judge each food from whichever
+  photo shows it most clearly.
+- Treat a label, packet or menu as evidence about food that is already on the
+  plate, not as an extra item. Use its figures to correct a guess.
+- Only add a separate entry when a photo genuinely shows a food the others do
+  not.
 - Judge portion size against visual references in frame (plate diameter, cutlery,
   hands, cans). Say which reference you used in "notes".
 - Account for visible cooking fat, dressings, sauces and toppings.

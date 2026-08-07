@@ -127,26 +127,36 @@ function parseImageDataUrl(dataUrl: string): {
 }
 
 /**
- * Estimate nutrition from a photo.
+ * Estimate nutrition from one or more photos of the same meal.
  *
- * `imageDataUrl` must be a full data URL — the route validates the prefix and
- * size before this is called. The image is never persisted.
+ * Each entry must be a full data URL — the route validates prefixes and sizes
+ * before this is called. Images are never persisted.
+ *
+ * Several photos are one analysis, not several merged afterwards. The model has
+ * to see them together to recognise that the plate in one and the close-up in
+ * another are the same food — precisely the judgement that would be lost by
+ * analysing each separately and adding the results up.
  */
-export async function analyzeMealPhoto(
-  imageDataUrl: string,
+export async function analyzeMealPhotos(
+  imageDataUrls: string[],
   context: AnalyzeContext & { caption?: string },
 ): Promise<MealAnalysis> {
   const userContext = buildUserContext(context);
-  const image = parseImageDataUrl(imageDataUrl);
+  const images = imageDataUrls.map(parseImageDataUrl);
+
+  const subject =
+    images.length > 1
+      ? `Analyse this meal. All ${images.length} photos are of the SAME meal — combine them into one list.`
+      : "Analyse this meal photo.";
 
   const request: ProviderRequest = {
     system: userContext
       ? `${VISION_ANALYSIS_PROMPT}\n\n${userContext}`
       : VISION_ANALYSIS_PROMPT,
     text: context.caption?.trim()
-      ? `Analyse this meal. The user adds: ${context.caption.trim()}`
-      : "Analyse this meal photo.",
-    image,
+      ? `${subject} The user adds: ${context.caption.trim()}`
+      : subject,
+    images,
   };
 
   return parseAnalysis(await getProvider()(request));

@@ -19,8 +19,15 @@ const MAX_EDGE = 1280;
 /** Starting JPEG quality; reduced if the result is still too large. */
 const INITIAL_QUALITY = 0.82;
 
-/** Ceiling for the encoded data URL — far below the platform limit. */
-const MAX_DATA_URL_CHARS = 3_000_000;
+/**
+ * Ceiling for one encoded data URL.
+ *
+ * Sized so several photos of the same meal still fit in one request: four at
+ * this limit stay under the platform's body cap with room to spare. A 1280px
+ * JPEG lands far below it anyway — the quality step-down only engages on
+ * unusually busy images.
+ */
+const MAX_DATA_URL_CHARS = 750_000;
 
 export class ImageProcessingError extends Error {
   constructor(message: string) {

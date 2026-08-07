@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 
-import { analyzeMealPhoto, analyzeMealText } from "@/lib/ai/analyze";
+import { analyzeMealPhotos, analyzeMealText } from "@/lib/ai/analyze";
 import { handleRouteError, ok } from "@/lib/api/response";
 import { getOrCreateProfile } from "@/lib/db/queries";
 import { requireUserId } from "@/lib/auth/session";
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     const analysis =
       input.mode === "text"
         ? await analyzeMealText(input.description, context)
-        : await analyzeMealPhoto(input.image, {
+        : await analyzeMealPhotos(input.images, {
             ...context,
             caption: input.caption,
           });

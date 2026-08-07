@@ -4,8 +4,8 @@ export interface ProviderRequest {
   system: string;
   /** The user's written description, or the caption accompanying a photo. */
   text: string;
-  /** Present only for photo analysis. */
-  image?: { mediaType: string; base64: string };
+  /** Present only for photo analysis; several are photos of one meal. */
+  images?: Array<{ mediaType: string; base64: string }>;
 }
 
 /**

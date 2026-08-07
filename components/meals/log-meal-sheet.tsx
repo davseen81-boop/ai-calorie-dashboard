@@ -39,11 +39,8 @@ import { useAnalyzeMeal, useProfile, useSaveMeal } from "@/hooks/use-meals";
 import { useViewedDate } from "@/components/providers/viewed-date";
 import { instantOnLocalDate } from "@/lib/date";
 import type { AnalyzedItem, AnalyzeResponse, MealType } from "@/types/api";
-import {
-  ImageProcessingError,
-  formatBytes,
-  prepareImageForUpload,
-} from "@/lib/images";
+import { ImageProcessingError, prepareImageForUpload } from "@/lib/images";
+import { MAX_PHOTOS } from "@/lib/validation/meals";
 import { AnalyzedItemsEditor } from "./analyzed-items-editor";
 import { RepeatPicker } from "./repeat-picker";
 
@@ -92,8 +89,7 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
   const [stage, setStage] = useState<Stage>("input");
   const [description, setDescription] = useState("");
   const [caption, setCaption] = useState("");
-  const [image, setImage] = useState<string | null>(null);
-  const [imageInfo, setImageInfo] = useState<string | null>(null);
+  const [images, setImages] = useState<string[]>([]);
   const [preparing, setPreparing] = useState(false);
   const [mealTypeHint, setMealTypeHint] = useState<MealType | "auto">("auto");
 
@@ -135,11 +131,11 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
   }
 
   function handleAnalyzePhoto() {
-    if (!image) return;
+    if (images.length === 0) return;
     analyze.mutate(
       {
         mode: "photo",
-        image,
+        images,
         ...(caption.trim() ? { caption: caption.trim() } : {}),
         ...(mealTypeHint !== "auto" ? { mealTypeHint } : {}),
       },
@@ -147,16 +143,33 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
     );
   }
 
-  async function handleFile(file: File) {
+  /**
+   * Prepare and add photos.
+   *
+   * Several at once because the file picker allows a multi-select, and one at a
+   * time because the camera returns a single shot — both paths land here.
+   * Compressed in the browser: the raw files are far too big to POST, and this
+   * also re-encodes HEIC and fixes EXIF rotation.
+   */
+  async function handleFiles(files: File[]) {
+    const room = MAX_PHOTOS - images.length;
+    if (room <= 0) {
+      toast.error(`Up to ${MAX_PHOTOS} photos of one meal.`);
+      return;
+    }
+
+    // Silently dropping the extras would look like a failure to attach them.
+    if (files.length > room) {
+      toast.error(`Only ${room} more photo${room === 1 ? "" : "s"} will fit — the rest were skipped.`);
+    }
+
     setPreparing(true);
     try {
-      // Compressed in the browser: the raw file is far too big to POST, and
-      // this also re-encodes HEIC and fixes EXIF rotation.
-      const prepared = await prepareImageForUpload(file);
-      setImage(prepared.dataUrl);
-      setImageInfo(
-        `${formatBytes(prepared.originalBytes)} → ${formatBytes(prepared.encodedBytes)}`,
-      );
+      const prepared: string[] = [];
+      for (const file of files.slice(0, room)) {
+        prepared.push((await prepareImageForUpload(file)).dataUrl);
+      }
+      setImages((current) => [...current, ...prepared]);
     } catch (error) {
       toast.error(
         error instanceof ImageProcessingError
@@ -304,10 +317,13 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
                 ref={libraryInput}
                 type="file"
                 accept="image/*"
+                // The library picker takes several at once; the camera below
+                // cannot, since it returns one shot at a time.
+                multiple
                 className="hidden"
                 onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void handleFile(file);
+                  const files = Array.from(e.target.files ?? []);
+                  if (files.length) void handleFiles(files);
                   // Reset so picking the same file twice still fires onChange.
                   e.target.value = "";
                 }}
@@ -320,68 +336,87 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) void handleFile(file);
+                  if (file) void handleFiles([file]);
                   e.target.value = "";
                 }}
               />
 
-              {image ? (
-                <div className="relative overflow-hidden rounded-xl border">
-                  {/* eslint-disable-next-line @next/next/no-img-element --
-                      the source is a client-side data URL, which next/image
-                      cannot optimise. */}
-                  <img
-                    src={image}
-                    alt="Meal preview"
-                    className="max-h-72 w-full object-cover"
-                  />
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    className="absolute right-2 top-2 size-8 rounded-full"
-                    onClick={() => {
-                      setImage(null);
-                      setImageInfo(null);
-                    }}
-                    aria-label="Remove photo"
-                  >
-                    <X className="size-4" />
-                  </Button>
-                  {imageInfo && (
-                    <span className="absolute bottom-2 left-2 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white">
-                      compressed {imageInfo}
-                    </span>
-                  )}
+              {images.length > 0 && (
+                <div className="grid grid-cols-3 gap-2">
+                  {images.map((src, index) => (
+                    <div
+                      key={index}
+                      className="relative aspect-square overflow-hidden rounded-xl border"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element --
+                          the source is a client-side data URL, which
+                          next/image cannot optimise. */}
+                      <img
+                        src={src}
+                        alt={`Meal photo ${index + 1}`}
+                        className="size-full object-cover"
+                      />
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        className="absolute right-1 top-1 size-7 rounded-full"
+                        onClick={() =>
+                          setImages((current) =>
+                            current.filter((_, i) => i !== index),
+                          )
+                        }
+                        aria-label={`Remove photo ${index + 1}`}
+                      >
+                        <X className="size-3.5" />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
-              ) : preparing ? (
-                <div className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed py-12 text-muted-foreground">
-                  <Loader2 className="size-8 animate-spin" />
-                  <span className="text-sm font-medium">Preparing photo…</span>
+              )}
+
+              {preparing ? (
+                <div className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed py-8 text-muted-foreground">
+                  <Loader2 className="size-7 animate-spin" />
+                  <span className="text-sm font-medium">Preparing…</span>
                 </div>
-              ) : (
+              ) : images.length < MAX_PHOTOS ? (
                 <div className="space-y-2">
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => libraryInput.current?.click()}
-                      className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed py-10 text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                      className={cn(
+                        "flex flex-col items-center gap-2 rounded-xl border-2 border-dashed text-muted-foreground transition-colors hover:border-primary hover:text-primary",
+                        images.length > 0 ? "py-5" : "py-10",
+                      )}
                     >
-                      <ImageIcon className="size-7" />
-                      <span className="text-sm font-medium">Choose photo</span>
+                      <ImageIcon className={images.length > 0 ? "size-5" : "size-7"} />
+                      <span className="text-sm font-medium">
+                        {images.length > 0 ? "Add more" : "Choose photos"}
+                      </span>
                     </button>
                     <button
                       type="button"
                       onClick={() => cameraInput.current?.click()}
-                      className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed py-10 text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                      className={cn(
+                        "flex flex-col items-center gap-2 rounded-xl border-2 border-dashed text-muted-foreground transition-colors hover:border-primary hover:text-primary",
+                        images.length > 0 ? "py-5" : "py-10",
+                      )}
                     >
-                      <Camera className="size-7" />
+                      <Camera className={images.length > 0 ? "size-5" : "size-7"} />
                       <span className="text-sm font-medium">Take photo</span>
                     </button>
                   </div>
                   <p className="text-center text-xs text-muted-foreground">
-                    Any size — it&apos;s resized on your device before upload.
+                    {images.length > 0
+                      ? `${images.length} of ${MAX_PHOTOS} — add another angle, or the packet.`
+                      : `Up to ${MAX_PHOTOS} of the same meal. Any size — they're resized on your device.`}
                   </p>
                 </div>
+              ) : (
+                <p className="text-center text-xs text-muted-foreground">
+                  {MAX_PHOTOS} photos is the limit. Remove one to swap it.
+                </p>
               )}
 
               <div className="space-y-2">
@@ -404,18 +439,18 @@ function LogMealForm({ onDone }: { onDone: () => void }) {
 
               <Button
                 className="gradient-primary w-full hover:opacity-90"
-                disabled={!image || analyze.isPending}
+                disabled={images.length === 0 || analyze.isPending}
                 onClick={handleAnalyzePhoto}
               >
                 {analyze.isPending ? (
                   <>
                     <Loader2 className="mr-2 size-4 animate-spin" />
-                    Analysing photo…
+                    Analysing…
                   </>
                 ) : (
                   <>
                     <Sparkles className="mr-2 size-4" />
-                    Analyse photo
+                    {images.length > 1 ? `Analyse ${images.length} photos` : "Analyse photo"}
                   </>
                 )}
               </Button>

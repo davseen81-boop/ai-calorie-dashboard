@@ -12,7 +12,13 @@ import { MEAL_TYPES, MEAL_SOURCES } from "@/lib/db/schema";
  *
  * The client compresses to well under this; the limit is a backstop.
  */
-const MAX_IMAGE_DATA_URL_CHARS = 3_500_000;
+const MAX_IMAGE_DATA_URL_CHARS = 1_200_000;
+
+/** More than this for one meal is a gallery, not a plate. */
+export const MAX_PHOTOS = 4;
+
+/** Combined ceiling across every photo in one request. */
+const MAX_TOTAL_CHARS = 3_500_000;
 
 const dataUrlSchema = z
   .string()
@@ -43,7 +49,17 @@ export const analyzeRequestSchema = z.discriminatedUnion("mode", [
   }),
   z.object({
     mode: z.literal("photo"),
-    image: dataUrlSchema,
+    images: z
+      .array(dataUrlSchema)
+      .min(1, "Add a photo first.")
+      .max(MAX_PHOTOS, `Up to ${MAX_PHOTOS} photos of one meal.`)
+      // Each image is capped on its own, but four large ones would still
+      // exceed the platform's body limit together — and that rejection happens
+      // before this code runs, so it has to be prevented rather than handled.
+      .refine(
+        (images) => images.reduce((sum, url) => sum + url.length, 0) <= MAX_TOTAL_CHARS,
+        "Those photos are too large together. Remove one and try again.",
+      ),
     caption: z.string().trim().max(500).optional(),
     mealTypeHint: z.enum(MEAL_TYPES).optional(),
   }),

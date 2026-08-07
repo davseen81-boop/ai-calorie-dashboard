@@ -96,7 +96,13 @@ export function useProfile() {
 
 export type AnalyzePayload =
   | { mode: "text"; description: string; mealTypeHint?: MealType }
-  | { mode: "photo"; image: string; caption?: string; mealTypeHint?: MealType };
+  | {
+      mode: "photo";
+      /** Several are photos of one meal, analysed together. */
+      images: string[];
+      caption?: string;
+      mealTypeHint?: MealType;
+    };
 
 export function useAnalyzeMeal() {
   return useMutation({

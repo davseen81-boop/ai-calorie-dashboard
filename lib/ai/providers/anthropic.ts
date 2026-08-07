@@ -14,7 +14,7 @@ let client: Anthropic | null = null;
  * single env var. `output_config.format` constrains the response to the
  * schema; Zod still re-checks the values.
  */
-export const callAnthropic: ProviderCall = async ({ system, text, image }) => {
+export const callAnthropic: ProviderCall = async ({ system, text, images }) => {
   const apiKey = aiEnv.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new AiAnalysisError(
@@ -36,25 +36,21 @@ export const callAnthropic: ProviderCall = async ({ system, text, image }) => {
         {
           role: "user",
           content: [
-            ...(image
-              ? ([
-                  {
-                    type: "image",
-                    source: {
-                      type: "base64",
-                      media_type:
-                        image.mediaType as "image/jpeg" | "image/png" | "image/gif" | "image/webp",
-                      data: image.base64,
-                    },
-                  },
-                ] satisfies Anthropic.ContentBlockParam[])
-              : []),
+            ...((images ?? []).map((image) => ({
+              type: "image",
+              source: {
+                type: "base64",
+                media_type:
+                  image.mediaType as "image/jpeg" | "image/png" | "image/gif" | "image/webp",
+                data: image.base64,
+              },
+            })) satisfies Anthropic.ContentBlockParam[]),
             { type: "text", text },
           ],
         },
       ],
       output_config: {
-        effort: image ? "medium" : "low",
+        effort: images?.length ? "medium" : "low",
         format: { type: "json_schema", schema: mealAnalysisJsonSchema },
       },
     });
